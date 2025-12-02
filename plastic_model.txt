@@ -1,0 +1,56 @@
+Step 1: Prepare the Model and App FilesModel Location: Take the downloaded file (best_float32.tflite) and place it inside a dedicated folder in your Expo project:Create a folder: assets/models/Place your file inside: assets/models/plasti_sort_v1.tfliteInstall the Bridge: We will use the high-performance TensorFlow Lite library for React Native.Bashnpx expo install react-native-fast-tflite
+Configure Metro (Asset Resolver): You need to tell Expo's bundler that .tflite files are allowed assets. Open your metro.config.js file and add the extension:JavaScriptconst { getDefaultConfig } = require('expo/metro-config');
+const config = getDefaultConfig(__dirname);
+
+// Add .tflite to the list of recognized file extensions
+config.resolver.assetExts.push('tflite');
+
+module.exports = config;
+Step 2: Enable GPU Acceleration (The Speed Boost)To ensure the app is lightning fast on both iOS and Android, enable native GPU acceleration via the Expo config plugin.Open your app.config.js or app.json and add the react-native-fast-tflite plugin:JSON{
+  "name": "PlastiSort AI",
+  "plugins": [
+    [
+      "react-native-fast-tflite",
+      {
+        "enableCoreMLDelegate": true,   // For iOS (Apple's GPU acceleration)
+        "enableAndroidGpuLibraries": true // For Android GPU acceleration
+      }
+    ]
+  ]
+}
+You must restart your Expo server after changing the configuration file.Step 3: Implement Camera Scanning LogicNow, in your CameraScannerScreen.js file, you will load the model and run the classification logic.Load the Model:JavaScriptimport { loadTensorflowModel } from 'react-native-fast-tflite';
+import { useEffect, useState } from 'react';
+
+const [model, setModel] = useState(null);
+
+useEffect(() => {
+  const loadModel = async () => {
+    // Load the model from the asset folder
+    const loadedModel = await loadTensorflowModel(
+      require('../assets/models/plasti_sort_v1.tflite')
+    );
+    setModel(loadedModel);
+    console.log("AI Model loaded successfully!");
+  };
+  loadModel();
+}, []);
+Process an Image (Manual Scan - Simpler MVP)When the user takes a picture (e.g., using expo-image-picker or expo-camera), you need to resize that image to the model's required input size (which is 640x640) and then convert it into a tensor (an array of pixel values).Note: The exact tensor preparation code is complex and usually requires a helper function using tfjs-react-native or a native utility (like vision-camera-resize-plugin if using real-time video).JavaScript// **This is simplified pseudocode for the inference call:**
+const runInference = async (imageTensor) => {
+  if (!model) return;
+
+  // 1. Convert image to the required 640x640 tensor (Batch, Height, Width, Channels)
+
+  // 2. Run the model
+  const outputData = await model.run([imageTensor]);
+
+  // 3. Interpret the output
+  const detection_boxes = outputData[0]; // Bounding box coordinates
+  const detection_classes = outputData[1]; // Class indices (0 to 5)
+  const detection_scores = outputData[2]; // Confidence scores
+
+  // We need a helper function to map the index (0, 1, 2, etc.) to the name (PET, HDPE, etc.)
+  const results = parseYoloOutput(detection_boxes, detection_classes, detection_scores);
+
+  return results;
+};
+Step 4: Interpret the Output (The Final Step)Your YOLO model outputs an array of numbers that represent the detection boxes. You need a simple JavaScript object to map the numeric class index back to the plastic name.IndexNameBin Color0PETGreen1HDPEGreen2PVCRed3LDPERed4PPGreen5PSRedYour app's parsing function will read the highest confidence score and look up the name and bin color from this table.This framework uses the fastest libraries found in the search results (react-native-fast-tflite for performance) and establishes the correct flow: Load Model -> Prepare Input (640x640) -> Run Inference -> Map Output to UI.

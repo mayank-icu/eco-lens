@@ -1,0 +1,264 @@
+Create a complete React Native Expo app called "PlastiSort AI" - a plastic waste sorting and recycling impact tracker.
+
+CORE CONCEPT:
+Users scan plastic items with their camera, AI identifies the plastic type, tells them which recycling bin to use, and tracks their environmental impact with gamification.
+
+AUTHENTICATION & USER FLOW:
+- Welcome screen with app logo and tagline
+- Option to "Continue as Guest", "Sign in with Google", or "Sign in with Email"
+- Guest users can browse and use core features but prompted to sign up to save progress
+- Allow guests to convert to full account anytime without losing data
+- Email/password registration with email verification
+- Google OAuth integration
+- Profile setup after signup (name, school/organization selection, avatar upload)
+- Forgot password flow with email reset
+
+HOME SCREEN:
+- Top header with user avatar, greeting, and notification bell
+- Quick stats cards showing: Total Items Scanned, CO2 Saved, Current Streak, World Rank
+- Animated tree visualization that grows taller as user earns more impact points (use Lottie or custom SVG animation)
+- Tree starts as small sprout at 0 points, becomes full tree at 1000+ points
+- Quick action button: "Scan Plastic Now" (large, prominent, green)
+- Recent activity feed showing last 5 scans with plastic type and timestamp
+- Weekly challenge card: "Sort 20 items this week - 45% complete"
+- Bottom tab navigation: Home, Scan, Impact, Leaderboard, Profile
+
+CAMERA/SCAN SCREEN:
+- Full-screen camera viewfinder with overlay guides
+- Flashlight toggle button
+- Gallery upload button to scan from photos
+- Big circular "Capture" button
+- Instructions overlay: "Point camera at plastic item's recycling symbol"
+- After capture, show loading state with "Analyzing plastic..." animation
+- Results screen displays:
+  * Large plastic type icon and name (PET, HDPE, PP, LDPE, PVC, PS, OTHER)
+  * Confidence percentage with color-coded badge (green >80%, yellow 60-80%, red <60%)
+  * Recycling bin color indicator (large colored circle: GREEN for recyclable, RED for non-recyclable, YELLOW for needs cleaning)
+  * Clear instruction text: "Place in GREEN bin" with icon
+  * Educational section: "Why this matters" with brief fact about this plastic type
+  * Environmental stats: "Recycling this saves X grams of CO2"
+  * Action buttons: "Log This Item" (saves to history), "Scan Another", "Learn More"
+- If confidence is low (<60%), show "Unsure? Try different angle" with rescan option
+- Haptic feedback on successful scan
+
+IMPACT DASHBOARD:
+- Hero section with large animated number showing total impact points
+- Breakdown cards with icons:
+  * Total items scanned (with trend: +12 this week)
+  * Total weight sorted (estimated based on item types)
+  * CO2 saved (in kg, with tree equivalent: "Equal to 5 trees")
+  * Plastic waste prevented from ocean (in kg)
+- Interactive pie chart showing plastic types distribution (PET 45%, HDPE 30%, etc.)
+- Timeline/calendar view showing daily scanning activity (GitHub-style contribution graph)
+- Impact milestones with progress bars:
+  * Beginner (0-50 items) ✓ Complete
+  * Eco Warrior (50-200 items) → 65% complete
+  * Planet Saver (200-500 items) → Locked
+- Monthly comparison: "You sorted 23% more than last month!"
+- Carbon credit calculation: "Your actions = 0.8 carbon credits"
+- Share button: "Share My Impact" (generates shareable graphic for social media)
+
+LEADERBOARD SCREEN:
+- Segmented control tabs: Global, Country, School, Friends
+- Time filter: Today, This Week, This Month, All Time
+- Top 3 podium display with avatars, usernames, and points (gold/silver/bronze styling)
+- Scrollable list below showing ranks 4-100 with:
+  * Rank number with up/down indicator
+  * User avatar and name
+  * School name (if set)
+  * Total points
+  * Badge icons for achievements
+- Current user's rank highlighted in different color and pinned at bottom
+- "Challenge" button next to each user to send friendly competition notification
+- School leaderboard shows aggregate points per school with school logos
+
+PROFILE SCREEN:
+- Cover photo area with user's avatar (large, circular)
+- Edit profile button (top right)
+- User stats summary: Member since, Total scans, Rank, Level
+- Achievement badges grid showing earned and locked badges:
+  * First Scan (scan 1 item)
+  * Getting Started (scan 10 items)
+  * Dedicated Sorter (7 day streak)
+  * Eco Champion (100 items)
+  * Perfect Week (scan every day for 7 days)
+  * Diversity Expert (scan all 7 plastic types)
+  * Community Leader (reach top 10 in school)
+  * Planet Protector (save 10kg CO2)
+  * Each badge has icon, name, description, unlock date or progress bar
+- Scan history section with expandable list:
+  * Date grouping (Today, Yesterday, Last Week)
+  * Each item shows: plastic type icon, name, timestamp, bin color
+  * Tap to see details and learn more
+- Settings button leading to:
+  * Account settings (email, password, linked accounts)
+  * Notifications preferences
+  * School/organization selection
+  * Units (metric/imperial)
+  * Language
+  * Privacy settings
+  * Data export
+  * Delete account
+  * Logout
+
+EDUCATIONAL CONTENT:
+- "Learn More" button on scan results opens detailed plastic info:
+  * Full name and chemical composition
+  * Common products made from this plastic
+  * Recycling process explanation with illustrations
+  * Environmental impact facts
+  * Tips for reducing usage
+  * Alternative materials
+- General education tab accessible from menu:
+  * Articles about plastic pollution
+  * Recycling best practices
+  * Video tutorials
+  * Quiz section to earn bonus points
+
+GAMIFICATION ELEMENTS:
+- XP/Points system: earn points for each scan, daily login, achievements
+- Level system (Level 1-50) with progress bar in profile
+- Daily streak counter with fire icon (resets if user misses a day)
+- Streak freeze items (earn or purchase to save streak)
+- Daily bonus: "Come back tomorrow for +50 bonus points!"
+- Push notifications for: streak reminder, new achievement, leaderboard position change, friend activity
+- Confetti animation when earning new badge or reaching milestone
+- Sound effects for positive actions (toggle in settings)
+- Weekly challenges with special rewards
+- Seasonal events: "Earth Month Challenge - Sort 100 items in April"
+
+SOCIAL FEATURES:
+- Add friends by username search or phone contacts
+- Friends activity feed: "Sarah scanned a PET bottle", "Mike reached 500 points"
+- Direct challenges: "Sort more items than your friend this week"
+- Team/group creation for schools or organizations
+- Share scan results: "I just sorted my 100th plastic item!" with auto-generated graphic
+- Comment/react on friends' achievements
+
+BACKEND DATA STRUCTURE:
+- Users collection: uid, email, displayName, photoURL, school, createdAt, totalPoints, level, currentStreak, longestStreak
+- Scans collection: userId, plasticType, confidence, timestamp, weight (estimated), co2Saved, binColor, imageUrl (optional)
+- Achievements collection: userId, badgeId, unlockedAt
+- Leaderboard collection: userId, points, rank, country, school, lastUpdated
+- Schools collection: schoolId, name, logo, totalStudents, totalPoints, country
+- Challenges collection: challengeId, title, description, startDate, endDate, targetScans, participants, prizes
+
+DATABASE & AUTH:
+- Firebase Authentication for email/password and Google OAuth
+- Firestore for all app data with real-time listeners
+- Cloud Storage for user avatars and optional scan images
+- Security rules to prevent data tampering
+- Offline persistence enabled so app works without internet
+- Background sync when connection restored
+
+DESIGN SYSTEM:
+- Primary color: Deep green (#2D5F3F)
+- Secondary color: Fresh green (#4CAF50)
+- Accent color: Light green (#81C784)
+- Error/non-recyclable: Red (#EF5350)
+- Warning/needs cleaning: Amber (#FFA726)
+- Background: Clean white (#FFFFFF) with subtle gray sections (#F5F5F5)
+- Text: Dark gray (#212121) primary, Medium gray (#757575) secondary
+- Cards with subtle shadows and 12px border radius
+- Consistent 16px padding and margins
+- San-serif font family (System default: SF Pro on iOS, Roboto on Android)
+- Font sizes: 28px (titles), 20px (headings), 16px (body), 14px (captions)
+- Icons from Lucide or Feather icon set for consistency
+- Smooth page transitions with slide animations
+- Button press feedback with scale animation (0.95 scale on press)
+- Loading states with skeleton screens, not just spinners
+- Empty states with illustrations and encouraging copy
+- Error states with retry options and helpful messages
+
+USER EXPERIENCE POLISH:
+- Splash screen with app logo during initial load
+- Onboarding flow for first-time users (3-4 screens explaining features, swipeable)
+- Skip button on onboarding
+- Animated transitions between screens (slide, fade)
+- Pull-to-refresh on feeds and leaderboards
+- Infinite scroll on leaderboard with pagination
+- Optimistic UI updates (show changes immediately, sync in background)
+- Success toasts for actions: "Item logged successfully!"
+- Confirmation dialogs for destructive actions: "Delete account?"
+- Image caching for faster avatar and icon loading
+- Debounced search in user search/friends add
+- Keyboard avoiding view in forms
+- Form validation with inline error messages
+- Auto-focus on input fields when screen opens
+- Haptic feedback on important interactions
+- Dark mode support (respect system preference)
+- Accessibility: screen reader labels, sufficient contrast, touch target sizes 44px minimum
+- Proper keyboard navigation for web
+- Responsive layout that works on tablets and web browsers
+
+OFFLINE FUNCTIONALITY:
+- Cache recent scans and user data
+- Queue new scans when offline, sync when online
+- Show offline indicator in UI
+- Disable features that require internet (leaderboard, friends) with helpful message
+- Local storage for critical app state
+
+API INTEGRATION READY:
+- Centralized API service module with axios/fetch
+- Environment variables for API endpoints
+- Token refresh logic for auth
+- Request/response interceptors for error handling
+- Retry logic for failed requests
+- Abstract the AI model endpoint call so we can easily connect later:
+  * POST /api/classify with image data
+  * Returns: plasticType, confidence, binColor, educationalInfo, co2Impact
+- Abstract other API calls: leaderboard fetch, user stats, achievement unlocks
+
+PERFORMANCE OPTIMIZATIONS:
+- React Native's FlatList for long lists (leaderboard, history)
+- Memoization of expensive components
+- Image optimization and lazy loading
+- Code splitting for faster initial load
+- Analytics events for user behavior tracking (screen views, button clicks, scan completions)
+
+ADDITIONAL SCREENS:
+- Notifications center listing all notifications with read/unread states
+- Search screen to find friends or schools
+- School detail page showing school stats and top students
+- Achievement detail page with unlock requirements and rarity
+- FAQ/Help section with accordion-style questions
+- About page with app version, team info, contact
+- Terms of Service and Privacy Policy pages
+
+EDGE CASES & VALIDATION:
+- Handle camera permission denied gracefully
+- Handle gallery permission denied
+- Handle network errors with retry button
+- Validate email format on signup
+- Password strength indicator
+- Username uniqueness check
+- Handle expired sessions with auto-redirect to login
+- Rate limiting on API calls (show "please wait" if too many requests)
+- Handle deleted user accounts in leaderboard/friends
+- Handle empty states: no scan history, no friends, no achievements yet
+- Handle very long usernames/school names with text truncation
+
+TESTING DATA SETUP:
+- Create real Firebase project with test data
+- Seed with 20-30 test users for leaderboard
+- Seed with achievement definitions
+- Seed with school data
+- Create sample scans for demo account
+
+CROSS-PLATFORM CONSIDERATIONS:
+- Use Expo's platform-specific code where needed (Platform.OS)
+- Test camera on iOS and Android separately
+- Ensure Google Sign-In works on iOS, Android, and web
+- Web-specific: responsive breakpoints for desktop view
+- Web-specific: proper meta tags and SEO
+- Use Expo's splash screen and app icon configuration
+
+BUILD & DEPLOYMENT READY:
+- Configured for EAS Build (Expo Application Services)
+- App.json with proper metadata: name, slug, version, icons, splash screen
+- Bundle identifier and package name set
+- Google OAuth client IDs for iOS, Android, and web configured
+- Firebase config files for each platform
+- Privacy descriptions for camera and photo library access (iOS Info.plist)
+
+The app should feel premium, smooth, and encouraging. Every interaction should make users feel proud of their environmental contribution. Make scanning plastic feel like a game, not a chore. Use encouraging copy throughout: "Amazing work!", "You're making a difference!", "Keep the streak alive!". The app should work flawlessly on iOS, Android, and web with consistent experience across all platforms.
