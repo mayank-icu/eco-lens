@@ -11,8 +11,8 @@ export const PLASTIC_CLASSES = [
     { id: 'PS', name: 'PS', binColor: 'red', description: 'Polystyrene' },
 ];
 
-const OLA_KRUTRIM_API_KEY = 'C2MeMjL7jQB63OfrITmBWyJGF';
-const OLA_KRUTRIM_URL = 'https://cloud.olakrutrim.com/v1/chat/completions';
+const OLA_KRUTRIM_API_KEY = '#';
+const OLA_KRUTRIM_URL = '#';
 
 export const loadModel = async (): Promise<boolean> => {
     return true;
@@ -22,8 +22,8 @@ const compressImage = async (uri: string) => {
     try {
         const result = await manipulateAsync(
             uri,
-            [{ resize: { width: 512 } }], // Resize to 512px width (maintain aspect ratio)
-            { compress: 0.7, format: SaveFormat.JPEG } // Compress to 70% quality
+            [{ resize: { width: 512 } }], 
+            { compress: 0.7, format: SaveFormat.JPEG } 
         );
         return result.uri;
     } catch (error) {
