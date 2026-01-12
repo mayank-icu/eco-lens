@@ -31,8 +31,15 @@ export interface User {
     totalScans: number;
     co2Saved: number;
     lastActiveDate?: Date;
+    lastClaimDate?: Date;
     streakFreezes: number;
     isGuest: boolean;
+    learningProgress?: { [key: string]: 'todo' | 'completed' };
+    claimedBadges?: string[];
+    notifications?: any[];
+    league?: 'Bronze' | 'Silver' | 'Gold' | 'Diamond';
+    lastLeagueCheck?: number; // Timestamp of last league check
+    leaderboardId?: string; // ID of the specific 20-person leaderboard bucket
 }
 
 // Scan Interface

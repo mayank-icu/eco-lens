@@ -1,9 +1,10 @@
 import { User } from '../types';
 
 export const XP_PER_SCAN = 10;
-export const XP_PER_STREAK_DAY = 5;
+export const XP_PER_STREAK_DAY = 10; // Increased daily impact points
 export const XP_PER_CHALLENGE = 50;
 export const XP_PER_REFERRAL = 100;
+export const XP_WEEKLY_BONUS = 100; // Bonus for 7th day
 
 export const calculateLevel = (points: number): number => {
     // Simple formula: Level = floor(sqrt(points / 20)) + 1

@@ -6,15 +6,20 @@ import {
     TouchableOpacity,
     StatusBar,
     ActivityIndicator,
+    Dimensions,
+    SafeAreaView,
+    ScrollView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialCommunityIcons, Feather, Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
-import { colors, spacing, typography, borderRadius, shadows, iconSizes } from '../constants/theme';
+import { AnimatedButton } from '../components/AnimatedButton';
+import { colors, spacing, typography, borderRadius } from '../constants/theme';
 
 interface WelcomeScreenProps {
     navigation: any;
 }
+
+const { width } = Dimensions.get('window');
 
 export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
     const [loading, setLoading] = useState(false);
@@ -24,7 +29,6 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
         setLoading(true);
         try {
             await loginAsGuest();
-            // Navigation will happen automatically via AppNavigator when user state changes
         } catch (error) {
             console.error('Guest login failed:', error);
             setLoading(false);
@@ -32,84 +36,97 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
     };
 
     return (
-        <View style={styles.container}>
-            <StatusBar barStyle="light-content" />
-
-            {/* Background Gradient */}
-            <View style={StyleSheet.absoluteFillObject}>
-                <LinearGradient
-                    colors={[colors.primaryDark, colors.primary, colors.primaryLight]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={StyleSheet.absoluteFillObject}
-                />
-
-                {/* Decorative circles */}
-                <View style={styles.decorativeCircle1} />
-                <View style={styles.decorativeCircle2} />
-            </View>
+        <SafeAreaView style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor="#e8e2d1" />
 
             <View style={styles.content}>
-                {/* Logo and Title */}
-                <View style={styles.header}>
-                    <View style={styles.logoContainer}>
-                        <MaterialCommunityIcons name="recycle" size={iconSizes.xxl * 1.5} color={colors.accentLight} />
-                        <View style={styles.sparkleContainer}>
-                            <Ionicons name="sparkles" size={iconSizes.md} color={colors.accent} />
+                {/* Hero Section */}
+                <View style={styles.hero}>
+                    <View style={styles.titleContainer}>
+                        <Text style={styles.title}>Smart Recycling</Text>
+                        <Text style={styles.subtitle}>for a Better Tomorrow</Text>
+                    </View>
+
+                    <Text style={styles.description}>
+                        Identify plastics instantly with AI, track your environmental impact, and make recycling simple
+                    </Text>
+                </View>
+
+                {/* Features Grid */}
+                {width < 768 ? (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.horizontalScroll}
+                        style={styles.featuresScrollView}
+                    >
+                        <View style={styles.featureCard}>
+                            <View style={styles.featureIcon}>
+                                <MaterialCommunityIcons name="camera-outline" size={24} color="#7fb069" />
+                            </View>
+                            <Text style={styles.featureTitle}>Instant Scan</Text>
+                            <Text style={styles.featureText}>AI-powered plastic identification</Text>
+                        </View>
+
+                        <View style={styles.featureCard}>
+                            <View style={styles.featureIcon}>
+                                <MaterialCommunityIcons name="chart-line" size={24} color="#7fb069" />
+                            </View>
+                            <Text style={styles.featureTitle}>Track Impact</Text>
+                            <Text style={styles.featureText}>Monitor your recycling progress</Text>
+                        </View>
+
+                        <View style={styles.featureCard}>
+                            <View style={styles.featureIcon}>
+                                <MaterialCommunityIcons name="school-outline" size={24} color="#7fb069" />
+                            </View>
+                            <Text style={styles.featureTitle}>Learn More</Text>
+                            <Text style={styles.featureText}>Discover recycling best practices</Text>
+                        </View>
+                    </ScrollView>
+                ) : (
+                    <View style={styles.featuresContainer}>
+                        <View style={styles.featureCard}>
+                            <View style={styles.featureIcon}>
+                                <MaterialCommunityIcons name="camera-outline" size={24} color="#7fb069" />
+                            </View>
+                            <Text style={styles.featureTitle}>Instant Scan</Text>
+                            <Text style={styles.featureText}>AI-powered plastic identification</Text>
+                        </View>
+
+                        <View style={styles.featureCard}>
+                            <View style={styles.featureIcon}>
+                                <MaterialCommunityIcons name="chart-line" size={24} color="#7fb069" />
+                            </View>
+                            <Text style={styles.featureTitle}>Track Impact</Text>
+                            <Text style={styles.featureText}>Monitor your recycling progress</Text>
+                        </View>
+
+                        <View style={styles.featureCard}>
+                            <View style={styles.featureIcon}>
+                                <MaterialCommunityIcons name="school-outline" size={24} color="#7fb069" />
+                            </View>
+                            <Text style={styles.featureTitle}>Learn More</Text>
+                            <Text style={styles.featureText}>Discover recycling best practices</Text>
                         </View>
                     </View>
-                    <Text style={styles.title}>PlastiSort AI</Text>
-                    <Text style={styles.subtitle}>Scan. Sort. Save the Planet.</Text>
-                    <View style={styles.tagline}>
-                        <Text style={styles.taglineText}>Join the recycling revolution</Text>
-                    </View>
-                </View>
+                )}
 
-                {/* Features */}
-                <View style={styles.features}>
-                    <FeatureCard
-                        icon={<MaterialCommunityIcons name="recycle" size={iconSizes.lg} color={colors.secondaryLight} />}
-                        title="Instant Scanning"
-                        description="AI-powered plastic identification"
-                    />
-                    <FeatureCard
-                        icon={<Feather name="trending-up" size={iconSizes.lg} color={colors.accent} />}
-                        title="Track Impact"
-                        description="Visualize your environmental contribution"
-                    />
-                    <FeatureCard
-                        icon={<Ionicons name="trophy" size={iconSizes.lg} color={colors.accentLight} />}
-                        title="Compete & Win"
-                        description="Global leaderboards & achievements"
-                    />
-                </View>
-
-                {/* Action Buttons */}
+                {/* Bottom Actions */}
                 <View style={styles.actions}>
-                    <TouchableOpacity
-                        style={[styles.button, styles.primaryButton]}
+                    <AnimatedButton
+                        title="Get Started"
                         onPress={() => navigation.navigate('SignUp')}
-                        activeOpacity={0.8}
-                    >
-                        <LinearGradient
-                            colors={[colors.secondary, colors.secondaryLight]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.buttonGradient}
-                        >
-                            <Text style={styles.primaryButtonText}>Get Started</Text>
-                            <Feather name="arrow-right" size={iconSizes.sm} color={colors.white} />
-                        </LinearGradient>
-                    </TouchableOpacity>
+                        variant="primary"
+                        size="medium"
+                    />
 
-                    <TouchableOpacity
-                        style={[styles.button, styles.secondaryButton]}
+                    <AnimatedButton
+                        title="I Have an Account"
                         onPress={() => navigation.navigate('Login')}
-                        activeOpacity={0.8}
-                    >
-                        <Feather name="user" size={iconSizes.sm} color={colors.white} />
-                        <Text style={styles.secondaryButtonText}>Sign In</Text>
-                    </TouchableOpacity>
+                        variant="outline"
+                        size="medium"
+                    />
 
                     <TouchableOpacity
                         style={styles.guestButton}
@@ -118,185 +135,118 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
                         activeOpacity={0.7}
                     >
                         {loading ? (
-                            <ActivityIndicator color={colors.accentLight} size="small" />
+                            <ActivityIndicator color={colors.textSecondary} size="small" />
                         ) : (
-                            <Text style={styles.guestButtonText}>Continue as Guest →</Text>
+                            <Text style={styles.guestButtonText}>Continue as Guest</Text>
                         )}
                     </TouchableOpacity>
                 </View>
             </View>
-        </View>
+        </SafeAreaView>
     );
 }
-
-const FeatureCard = ({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) => (
-    <View style={styles.featureCard}>
-        <View style={styles.featureIconContainer}>
-            {icon}
-        </View>
-        <View style={styles.featureContent}>
-            <Text style={styles.featureTitle}>{title}</Text>
-            <Text style={styles.featureDescription}>{description}</Text>
-        </View>
-    </View>
-);
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.primary,
-    },
-    decorativeCircle1: {
-        position: 'absolute',
-        width: 300,
-        height: 300,
-        borderRadius: 150,
-        backgroundColor: 'rgba(116, 198, 157, 0.1)',
-        top: -100,
-        right: -100,
-    },
-    decorativeCircle2: {
-        position: 'absolute',
-        width: 200,
-        height: 200,
-        borderRadius: 100,
-        backgroundColor: 'rgba(149, 213, 178, 0.08)',
-        bottom: 100,
-        left: -50,
+        backgroundColor: '#e8e2d1',
     },
     content: {
         flex: 1,
-        paddingHorizontal: spacing.lg,
-        paddingTop: spacing.xxxl,
-        paddingBottom: spacing.xl,
         justifyContent: 'space-between',
+        paddingHorizontal: spacing.lg,
+        paddingTop: spacing.xl,
+        paddingBottom: spacing.xl,
     },
-    header: {
+    hero: {
         alignItems: 'center',
-        marginTop: spacing.xl,
+        paddingTop: spacing.xxl,
     },
-    logoContainer: {
-        position: 'relative',
-        marginBottom: spacing.lg,
-    },
-    sparkleContainer: {
-        position: 'absolute',
-        top: -8,
-        right: -8,
-        backgroundColor: colors.primary,
-        borderRadius: borderRadius.round,
-        padding: spacing.xxs,
+    titleContainer: {
+        alignItems: 'center',
+        marginBottom: spacing.md,
     },
     title: {
-        fontSize: typography.fontSize.display,
-        fontWeight: typography.fontWeight.extraBold,
-        color: colors.white,
-        marginBottom: spacing.xs,
+        fontSize: 32,
+        fontWeight: typography.fontWeight.bold,
+        color: colors.textPrimary,
         textAlign: 'center',
-        letterSpacing: 0.5,
+        letterSpacing: 0.3,
     },
     subtitle: {
-        fontSize: typography.fontSize.bodyLarge,
-        color: colors.accentLight,
+        fontSize: 32,
+        fontWeight: typography.fontWeight.bold,
+        color: '#7fb069',
         textAlign: 'center',
+        letterSpacing: 0.3,
+    },
+    description: {
+        fontSize: typography.fontSize.body,
+        color: colors.textSecondary,
+        textAlign: 'center',
+        lineHeight: 24,
         fontWeight: typography.fontWeight.medium,
-    },
-    tagline: {
+        paddingHorizontal: spacing.md,
         marginTop: spacing.md,
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.sm,
-        backgroundColor: 'rgba(116, 198, 157, 0.15)',
-        borderRadius: borderRadius.round,
-        borderWidth: 1,
-        borderColor: 'rgba(116, 198, 157, 0.3)',
     },
-    taglineText: {
-        color: colors.accentLight,
-        fontSize: typography.fontSize.caption,
-        fontWeight: typography.fontWeight.semiBold,
+    featuresScrollView: {
+        flexGrow: 0,
     },
-    features: {
-        gap: spacing.md,
-        marginVertical: spacing.xl,
+    horizontalScroll: {
+        paddingHorizontal: spacing.xs,
+        gap: spacing.sm,
+    },
+    featuresContainer: {
+        flexDirection: 'row',
+        gap: spacing.sm,
+        paddingHorizontal: spacing.xs,
     },
     featureCard: {
-        flexDirection: 'row',
+        width: width < 768 ? width * 0.7 : undefined,
+        flex: width < 768 ? undefined : 1,
+        backgroundColor: colors.white,
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.12)',
-        paddingVertical: spacing.md,
-        paddingHorizontal: spacing.lg,
-        borderRadius: borderRadius.xl,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.15)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
     },
-    featureIconContainer: {
-        width: 56,
-        height: 56,
-        borderRadius: borderRadius.md,
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    featureIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: 'rgba(127, 176, 105, 0.15)',
+        alignItems: 'center',
         justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: spacing.md,
-    },
-    featureContent: {
-        flex: 1,
+        marginBottom: spacing.sm,
     },
     featureTitle: {
-        fontSize: typography.fontSize.body,
+        fontSize: typography.fontSize.small,
         fontWeight: typography.fontWeight.bold,
-        color: colors.white,
-        marginBottom: spacing.xxs,
+        color: colors.textPrimary,
+        marginBottom: 4,
+        textAlign: 'center',
     },
-    featureDescription: {
-        fontSize: typography.fontSize.caption,
-        color: colors.accentLight,
-        lineHeight: typography.lineHeight.normal * typography.fontSize.caption,
+    featureText: {
+        fontSize: 11,
+        color: colors.textSecondary,
+        textAlign: 'center',
+        lineHeight: 14,
     },
     actions: {
         gap: spacing.md,
-    },
-    button: {
-        borderRadius: borderRadius.xl,
-        overflow: 'hidden',
-    },
-    buttonGradient: {
-        flexDirection: 'row',
-        paddingVertical: spacing.md + spacing.xs,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: spacing.sm,
-    },
-    primaryButton: {
-        ...shadows.lg,
-    },
-    primaryButtonText: {
-        color: colors.white,
-        fontSize: typography.fontSize.bodyLarge,
-        fontWeight: typography.fontWeight.bold,
-        letterSpacing: 0.5,
-    },
-    secondaryButton: {
-        backgroundColor: 'transparent',
-        borderWidth: 2,
-        borderColor: 'rgba(255, 255, 255, 0.3)',
-        paddingVertical: spacing.md + spacing.xs,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: spacing.sm,
-    },
-    secondaryButtonText: {
-        color: colors.white,
-        fontSize: typography.fontSize.bodyLarge,
-        fontWeight: typography.fontWeight.semiBold,
+        paddingTop: spacing.md,
     },
     guestButton: {
         paddingVertical: spacing.md,
         alignItems: 'center',
     },
     guestButtonText: {
-        color: colors.accentLight,
-        fontSize: typography.fontSize.body,
-        fontWeight: typography.fontWeight.medium,
+        color: colors.textSecondary,
+        fontSize: typography.fontSize.small,
+        fontWeight: typography.fontWeight.semiBold,
     },
 });

@@ -1,11 +1,13 @@
 {
   "expo": {
-    "name": "PlastiSort AI",
+    "name": "Eco Lens",
     "slug": "plastisort-ai",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./src/assets/logo.png",
     "userInterfaceStyle": "automatic",
     "splash": {
+      "image": "./src/assets/logo.png",
       "backgroundColor": "#2D5F3F",
       "resizeMode": "contain"
     },
@@ -15,13 +17,15 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.plastisort.ai",
+      "icon": "./src/assets/logo.png",
       "infoPlist": {
-        "NSCameraUsageDescription": "PlastiSort AI needs access to your camera to scan plastic items and identify their type for proper recycling.",
-        "NSPhotoLibraryUsageDescription": "PlastiSort AI needs access to your photo library so you can upload images of plastic items to identify their type."
+        "NSCameraUsageDescription": "Eco Lens needs access to your camera to scan plastic items and identify their type for proper recycling.",
+        "NSPhotoLibraryUsageDescription": "Eco Lens needs access to your photo library so you can upload images of plastic items to identify their type."
       }
     },
     "android": {
       "package": "com.plastisort.ai",
+      "icon": "./src/assets/app-icon.png",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -29,24 +33,19 @@
         "android.permission.RECORD_AUDIO"
       ],
       "adaptiveIcon": {
+        "foregroundImage": "./src/assets/app-icon.png",
         "backgroundColor": "#2D5F3F"
       }
     },
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "favicon": "./src/assets/logo.png"
     },
     "plugins": [
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow PlastiSort AI to access your camera to scan plastic items."
-        }
-      ],
-      [
-        "react-native-fast-tflite",
-        {
-          "enableCoreMLDelegate": true,
-          "enableAndroidGpuLibraries": true
+          "cameraPermission": "Allow Eco Lens to access your camera to scan plastic items."
         }
       ]
     ],

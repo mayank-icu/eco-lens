@@ -1,54 +1,123 @@
-// Design System Constants for PlastiSort AI - Premium Edition
+// Design System Constants for PlastiSort AI - Duolingo Inspired Edition
 
-// Colors - Enhanced Color Palette
+// Colors - Vibrant, Playful, Duolingo-Inspired Palette
 export const colors = {
-    // Primary Colors - Deeper, richer greens
-    primary: '#1B4332',
-    primaryLight: '#2D5F3F',
-    primaryDark: '#081C15',
-    secondary: '#40916C',
-    secondaryLight: '#52B788',
-    accent: '#74C69D',
-    accentLight: '#95D5B2',
+    // Primary Colors - Earthy Green Theme
+    primary: '#7fb069',
+    primaryLight: '#a2d48b',
+    primaryDark: '#5a8c4a',
+    secondary: '#1CB0F6', // Bright blue
+    secondaryLight: '#4FC3F7',
+    accent: '#FF9600', // Vibrant orange
+    accentLight: '#FFC107',
 
-    // Status Colors
-    error: '#D62828',
-    warning: '#F77F00',
-    success: '#52B788',
-    info: '#4CC9F0',
+    // Fun accent colors
+    purple: '#CE82FF',
+    pink: '#FF4B4B',
+    yellow: '#FFC800',
+
+    // Status Colors - Vibrant
+    error: '#FF4B4B',
+    warning: '#FF9600',
+    success: '#58CC02',
+    info: '#1CB0F6',
 
     // Recycling Bin Colors
-    recyclableGreen: '#40916C',
-    nonRecyclableRed: '#D62828',
-    needsCleaningYellow: '#F77F00',
+    recyclableGreen: '#58CC02',
+    nonRecyclableRed: '#FF4B4B',
+    needsCleaningYellow: '#FFC800',
 
-    // Background Colors
+    // Background Colors - Clean & Bright
     white: '#FFFFFF',
-    lightGray: '#F8F9FA',
-    mediumGray: '#E9ECEF',
-    darkGray: '#6C757D',
-    backgroundGradientStart: '#F8F9FA',
-    backgroundGradientEnd: '#E9ECEF',
+    lightGray: '#efe9de',
+    mediumGray: '#E5E5E5',
+    darkGray: '#AFAFAF',
+    backgroundGradientStart: '#efe9de',
+    backgroundGradientEnd: '#FFFFFF',
+
+    // Home Page Card Colors
+    todayActionsCard: '#a4bc9e',
+    impactSnapshotCard: '#d5d8d1',
+    quickActionsCard: '#d5d7d0',
+    carouselGradientStart: '#fefdfb',
+    carouselGradientEnd: '#d4e8d0',
 
     // Text Colors
-    textPrimary: '#212529',
-    textSecondary: '#6C757D',
+    textPrimary: '#3C3C3C',
+    textSecondary: '#777777',
     textLight: '#FFFFFF',
-    textMuted: '#ADB5BD',
+    textMuted: '#AFAFAF',
 
     // Confidence Badge Colors
-    highConfidence: '#40916C',
-    mediumConfidence: '#F77F00',
-    lowConfidence: '#D62828',
+    highConfidence: '#58CC02',
+    mediumConfidence: '#FF9600',
+    lowConfidence: '#FF4B4B',
 
-    // Gradient Arrays
-    primaryGradient: ['#1B4332', '#2D5F3F', '#40916C'],
-    accentGradient: ['#52B788', '#74C69D', '#95D5B2'],
-    successGradient: ['#40916C', '#52B788'],
-    cardGradient: ['#FFFFFF', '#F8F9FA'],
+    // Gradient Arrays - Vibrant gradients
+    primaryGradient: ['#58CC02', '#89E219'],
+    secondaryGradient: ['#1CB0F6', '#4FC3F7'],
+    accentGradient: ['#FF9600', '#FFC107'],
+    purpleGradient: ['#CE82FF', '#DA9DFF'],
+    successGradient: ['#58CC02', '#89E219'],
+    cardGradient: ['#FFFFFF', '#F7F7F7'],
+    card: '#FFFFFF',
 };
 
-// Typography - More refined scale
+export const darkColors = {
+    // Primary Colors - Adjusted for dark mode
+    primary: '#58CC02',
+    primaryLight: '#89E219',
+    primaryDark: '#43A500',
+    secondary: '#1CB0F6',
+    secondaryLight: '#4FC3F7',
+    accent: '#FF9600',
+    accentLight: '#FFC107',
+
+    purple: '#CE82FF',
+    pink: '#FF4B4B',
+    yellow: '#FFC800',
+
+    // Status Colors
+    error: '#FF4B4B',
+    warning: '#FF9600',
+    success: '#58CC02',
+    info: '#1CB0F6',
+
+    // Recycling Bin Colors
+    recyclableGreen: '#58CC02',
+    nonRecyclableRed: '#FF4B4B',
+    needsCleaningYellow: '#FFC800',
+
+    // Background Colors - Dark
+    white: '#1F1F1F',
+    lightGray: '#2C2C2C',
+    mediumGray: '#3D3D3D',
+    darkGray: '#B0B0B0',
+    backgroundGradientStart: '#1F1F1F',
+    backgroundGradientEnd: '#2C2C2C',
+
+    // Text Colors
+    textPrimary: '#FFFFFF',
+    textSecondary: '#B0B0B0',
+    textLight: '#E0E0E0',
+    textMuted: '#777777',
+
+    // Confidence Badge Colors
+    highConfidence: '#58CC02',
+    mediumConfidence: '#FF9600',
+    lowConfidence: '#FF4B4B',
+
+    // Gradient Arrays
+    primaryGradient: ['#58CC02', '#43A500'],
+    secondaryGradient: ['#1CB0F6', '#1890C8'],
+    accentGradient: ['#FF9600', '#E08600'],
+    purpleGradient: ['#CE82FF', '#B66FE8'],
+    successGradient: ['#58CC02', '#43A500'],
+    cardGradient: ['#2C2C2C', '#3D3D3D'],
+    card: '#2C2C2C',
+};
+
+// Typography - Rounded, friendly feel
 export const typography = {
     fontSize: {
         xs: 10,
@@ -69,6 +138,7 @@ export const typography = {
         semiBold: '600' as const,
         bold: '700' as const,
         extraBold: '800' as const,
+        black: '900' as const,
     },
     lineHeight: {
         tight: 1.2,
@@ -89,18 +159,18 @@ export const spacing = {
     xxxl: 64,
 };
 
-// Border Radius - More variety
+// Border Radius - Rounder for playful feel
 export const borderRadius = {
     xs: 4,
     sm: 8,
     md: 12,
     lg: 16,
     xl: 20,
-    xxl: 24,
+    xxl: 28,
     round: 999,
 };
 
-// Shadows - Enhanced depth
+// Shadows - Softer, more pronounced
 export const shadows = {
     xs: {
         shadowColor: '#000',
@@ -139,12 +209,29 @@ export const shadows = {
     },
 };
 
-// Animation Durations
+// Animation Durations - Snappy like Duolingo
 export const animations = {
-    fast: 150,
-    normal: 250,
-    slow: 350,
-    verySlow: 500,
+    instant: 100,
+    fast: 200,
+    normal: 300,
+    slow: 400,
+    verySlow: 600,
+};
+
+// Spring configurations for bouncy animations
+export const springConfig = {
+    gentle: {
+        friction: 7,
+        tension: 40,
+    },
+    bouncy: {
+        friction: 5,
+        tension: 40,
+    },
+    wobbly: {
+        friction: 4,
+        tension: 40,
+    },
 };
 
 // Breakpoints for responsive design
@@ -155,7 +242,7 @@ export const breakpoints = {
     wide: 1440,
 };
 
-// Icon Sizes - More granular
+// Icon Sizes
 export const iconSizes = {
     xs: 14,
     sm: 18,
@@ -163,29 +250,54 @@ export const iconSizes = {
     lg: 32,
     xl: 40,
     xxl: 48,
+    xxxl: 64,
 };
 
 // Touch Target Size
 export const touchTarget = {
-    min: 44, // Minimum touch target size for accessibility
+    min: 44,
 };
 
-// Card Styles - Predefined premium card styles
+// Card Styles - Playful elevated cards
 export const cardStyles = {
     elevated: {
         backgroundColor: colors.white,
-        borderRadius: borderRadius.lg,
+        borderRadius: borderRadius.xl,
         ...shadows.md,
     },
     glass: {
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
-        borderRadius: borderRadius.lg,
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderRadius: borderRadius.xl,
         ...shadows.sm,
     },
     outlined: {
         backgroundColor: colors.white,
-        borderRadius: borderRadius.lg,
-        borderWidth: 1,
+        borderRadius: borderRadius.xl,
+        borderWidth: 2,
         borderColor: colors.mediumGray,
+    },
+    fun: {
+        backgroundColor: colors.white,
+        borderRadius: borderRadius.xl,
+        borderWidth: 3,
+        borderBottomWidth: 5,
+        borderColor: colors.mediumGray,
+        ...shadows.sm,
+    },
+};
+
+// Button 3D effect presets (Duolingo style)
+export const button3D = {
+    small: {
+        borderBottomWidth: 3,
+        borderRightWidth: 1,
+    },
+    medium: {
+        borderBottomWidth: 4,
+        borderRightWidth: 2,
+    },
+    large: {
+        borderBottomWidth: 6,
+        borderRightWidth: 2,
     },
 };

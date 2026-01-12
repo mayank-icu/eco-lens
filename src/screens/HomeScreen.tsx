@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect, useMemo, useCallback, memo } from 'react';
 import {
     View,
     Text,
@@ -6,218 +6,359 @@ import {
     ScrollView,
     TouchableOpacity,
     StatusBar,
-    Animated,
+    RefreshControl,
+    Dimensions,
+    Image,
+    Platform,
+    FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialCommunityIcons, Feather, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../contexts/AuthContext';
-import { colors, spacing, typography, borderRadius, shadows, iconSizes } from '../constants/theme';
+import { useGamification } from '../contexts/GamificationContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { DailyClaimModal } from '../components/DailyClaimModal';
+import HomeScreenSkeleton from '../components/HomeScreenSkeleton';
+import { colors as staticColors, spacing, typography, borderRadius } from '../constants/theme';
+
+const { width } = Dimensions.get('window');
 
 interface HomeScreenProps {
     navigation: any;
 }
 
+// Memoized components for better performance
+const TodayActionCard = memo(({ item, onPress }: any) => (
+    <TouchableOpacity
+        style={styles.todayActionCard}
+        onPress={onPress}
+        activeOpacity={0.7}
+    >
+        <Image
+            source={item.icon}
+            style={styles.todayActionIcon}
+            resizeMode="contain"
+            fadeDuration={0}
+        />
+        <Text style={styles.todayActionText} numberOfLines={2}>{item.title}</Text>
+    </TouchableOpacity>
+));
+
+const ImpactCard = memo(({ icon, label, value }: any) => (
+    <View style={styles.impactCard}>
+        <Image
+            source={icon}
+            style={styles.impactIcon}
+            resizeMode="contain"
+            fadeDuration={0}
+        />
+        <Text style={styles.impactLabel}>{label}</Text>
+        <Text style={styles.impactValue}>{value}</Text>
+    </View>
+));
+
+const CarouselCard = memo(({ item, colors }: any) => (
+    <LinearGradient
+        colors={[colors.carouselGradientStart, colors.carouselGradientEnd]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.carouselCard}
+    >
+        <View style={styles.carouselTextContainer}>
+            <Text style={styles.carouselHeading}>{item.heading}</Text>
+            <Text style={styles.carouselSubheading}>{item.subheading}</Text>
+        </View>
+        <Image
+            source={item.image}
+            style={styles.carouselImage}
+            resizeMode="contain"
+            fadeDuration={0}
+        />
+    </LinearGradient>
+));
+
+const QuickActionCard = memo(({ item, onPress }: any) => (
+    <TouchableOpacity
+        style={styles.quickActionCard}
+        onPress={onPress}
+        activeOpacity={0.7}
+    >
+        <Image
+            source={item.icon}
+            style={styles.quickActionIcon}
+            resizeMode="contain"
+            fadeDuration={0}
+        />
+        <Text style={styles.quickActionText}>{item.title}</Text>
+    </TouchableOpacity>
+));
+
 export default function HomeScreen({ navigation }: HomeScreenProps) {
-    const { user } = useContext(AuthContext);
-    const [treeScale] = useState(new Animated.Value(1));
+    const { user, refreshUser } = useContext(AuthContext);
+    const { checkDailyStreak, claimDailyReward } = useGamification();
+    const { colors, isDarkMode } = useTheme();
 
-    const animateTree = () => {
-        Animated.sequence([
-            Animated.timing(treeScale, {
-                toValue: 1.1,
-                duration: 200,
-                useNativeDriver: true,
-            }),
-            Animated.timing(treeScale, {
-                toValue: 1,
-                duration: 200,
-                useNativeDriver: true,
-            }),
-        ]).start();
+    const [refreshing, setRefreshing] = useState(false);
+    const [showClaimModal, setShowClaimModal] = useState(false);
+    const [claimData, setClaimData] = useState({ day: 1, streakBroken: false });
+
+    useEffect(() => {
+        checkStreakStatus();
+    }, [user?.uid]);
+
+    const checkStreakStatus = async () => {
+        const { canClaim, streakBroken, currentDay } = await checkDailyStreak();
+        if (canClaim) {
+            setClaimData({ day: currentDay, streakBroken });
+            setShowClaimModal(true);
+        }
     };
 
-    React.useEffect(() => {
-        // Pulse animation on mount
-        const pulse = Animated.loop(
-            Animated.sequence([
-                Animated.timing(treeScale, {
-                    toValue: 1.05,
-                    duration: 2000,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(treeScale, {
-                    toValue: 1,
-                    duration: 2000,
-                    useNativeDriver: true,
-                }),
-            ])
-        );
-        pulse.start();
-        return () => pulse.stop();
-    }, []);
+    const handleClaim = useCallback(async () => {
+        await claimDailyReward();
+        setShowClaimModal(false);
+    }, [claimDailyReward]);
 
-    const stats = {
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        try {
+            await refreshUser();
+            await checkStreakStatus();
+        } catch (error) {
+            console.log('Error refreshing:', error);
+        }
+        setRefreshing(false);
+    }, [refreshUser]);
+
+    // Memoized stats calculation
+    const stats = useMemo(() => ({
         scans: user?.totalScans || 0,
-        co2Saved: user?.co2Saved || 0, // Fixed property name
-        streak: user?.currentStreak || 0, // Fixed property name
+        co2Saved: user?.co2Saved || 0,
+        plasticSaved: ((user?.co2Saved || 0) / 1000).toFixed(2),
+        streak: user?.currentStreak || 0,
         level: user?.level || 1,
-        points: user?.totalPoints || 0, // Fixed property name
-    };
+        points: user?.totalPoints || 0,
+    }), [user?.totalScans, user?.co2Saved, user?.currentStreak, user?.level, user?.totalPoints]);
+
+    // Memoized action handlers
+    const handleScanPress = useCallback(() => navigation.navigate('Scan'), [navigation]);
+    const handleFindBinPress = useCallback(() => navigation.navigate('FindBin'), [navigation]);
+    const handleQuizPress = useCallback(() => {
+        navigation.navigate('Learn');
+    }, [navigation]);
+    const handleProfilePress = useCallback(() => navigation.navigate('Profile'), [navigation]);
+    const handleImpactPointsPress = useCallback(() => navigation.navigate('ImpactPoints'), [navigation]);
+    const handleNotificationsPress = useCallback(() => navigation.navigate('Notifications'), [navigation]);
+
+    // Memoized data arrays
+    const todayActions = useMemo(() => [
+        {
+            id: '1',
+            icon: require('../assets/icons/home-log_waste.png'),
+            title: 'Log Your Waste',
+            action: handleScanPress,
+        },
+        {
+            id: '2',
+            icon: require('../assets/icons/home-nearest_bin.png'),
+            title: 'Find Nearest Bin',
+            action: handleFindBinPress,
+        },
+        {
+            id: '3',
+            icon: require('../assets/icons/home-take_quiz.png'),
+            title: 'Take a Quiz',
+            action: handleQuizPress,
+        },
+    ], [handleScanPress, handleFindBinPress, handleQuizPress]);
+
+    const carouselData = useMemo(() => [
+        {
+            id: '1',
+            heading: 'Instant Recycling Check',
+            subheading: 'Scan and verify instantly',
+            image: require('../assets/icons/home-card2.png'),
+        },
+        {
+            id: '2',
+            heading: 'Global Green Network',
+            subheading: 'Join the movement',
+            image: require('../assets/icons/home-card4.png'),
+        },
+        {
+            id: '3',
+            heading: 'Earn Points, Get Rewards',
+            subheading: 'Redeem exciting perks',
+            image: require('../assets/icons/home-card3.png'),
+        },
+        {
+            id: '4',
+            heading: 'Clean for a Better Planet',
+            subheading: 'Rinse before recycling',
+            image: require('../assets/icons/home-card1.png'),
+        },
+    ], []);
+
+    const quickActions = useMemo(() => [
+        {
+            id: '1',
+            icon: require('../assets/icons/home-log_waste.png'),
+            title: 'Log Waste',
+            action: () => navigation.navigate('Scan'),
+        },
+        {
+            id: '2',
+            icon: require('../assets/icons/home-scan_history.png'),
+            title: 'Scan History',
+            action: () => navigation.navigate('ScanHistory'),
+        },
+        {
+            id: '3',
+            icon: require('../assets/icons/home-rewards.png'),
+            title: 'Rewards',
+            action: () => navigation.navigate('Stamps'),
+        },
+        {
+            id: '4',
+            icon: require('../assets/icons/home-tutorials.png'),
+            title: 'Tutorials',
+            action: () => navigation.navigate('Learn'),
+        },
+        {
+            id: '5',
+            icon: require('../assets/icons/home-bin_locations.png'),
+            title: 'Bin Locations',
+            action: () => navigation.navigate('FindBin'),
+        },
+        {
+            id: '6',
+            icon: require('../assets/icons/home-support.png'),
+            title: 'Support',
+            action: () => navigation.navigate('Help'),
+        },
+    ], [navigation]);
+
+    // Memoized render functions
+    const renderCarouselItem = useCallback(({ item }: any) => (
+        <CarouselCard item={item} colors={colors} />
+    ), [colors]);
+
+    const getItemLayout = useCallback((data: any, index: number) => ({
+        length: width * 0.92 + spacing.sm,
+        offset: (width * 0.92 + spacing.sm) * index,
+        index,
+    }), []);
 
     return (
-        <View style={styles.container}>
-            <StatusBar barStyle="light-content" />
+        <View style={[styles.container, { backgroundColor: colors.lightGray }]}>
+            <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.lightGray} />
 
-            <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-            >
-                {/* Premium Header with Gradient - Now inside ScrollView */}
-                <LinearGradient
-                    colors={[colors.primary, colors.primaryLight, colors.secondary]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.header}
-                >
-                    <View style={styles.headerContent}>
-                        <View>
-                            <Text style={styles.greeting}>Welcome back,</Text>
-                            <Text style={styles.userName}>{user?.displayName || 'Eco Warrior'}</Text>
-                        </View>
-                        <View style={styles.levelBadge}>
-                            <Ionicons name="sparkles" size={iconSizes.sm} color={colors.accentLight} />
-                            <Text style={styles.levelText}>Lv {stats.level}</Text>
-                        </View>
-                    </View>
+            <DailyClaimModal
+                visible={showClaimModal}
+                onClaim={handleClaim}
+                day={claimData.day}
+                streakBroken={claimData.streakBroken}
+            />
 
-                    {/* Impact Points */}
-                    <View style={styles.pointsCard}>
-                        <View style={styles.pointsContent}>
-                            <Ionicons name="leaf" size={iconSizes.lg} color={colors.secondary} />
-                            <View>
-                                <Text style={styles.pointsLabel}>Total Impact</Text>
-                                <Text style={styles.pointsValue}>{stats.points.toLocaleString()}</Text>
-                            </View>
-                        </View>
-                        <TouchableOpacity
-                            style={styles.pointsButton}
-                            onPress={() => navigation.navigate('Impact')}
-                        >
-                            <Text style={styles.pointsButtonText}>View</Text>
-                            <Feather name="chevron-right" size={iconSizes.sm} color={colors.secondary} />
-                        </TouchableOpacity>
-                    </View>
-                </LinearGradient>
-
-                {/* Quick Stats Grid */}
-                <View style={styles.statsGrid}>
-                    <StatsCard
-                        icon={<MaterialCommunityIcons name="barcode-scan" size={iconSizes.lg} color={colors.secondary} />}
-                        title="Scans"
-                        value={stats.scans}
-                        color={colors.secondary}
-                        iconBg="rgba(64, 145, 108, 0.12)"
-                    />
-                    <StatsCard
-                        icon={<Feather name="wind" size={iconSizes.lg} color={colors.info} />}
-                        title="CO₂ Saved"
-                        value={`${stats.co2Saved}g`}
-                        color={colors.info}
-                        iconBg="rgba(76, 201, 240, 0.12)"
-                    />
-                    <StatsCard
-                        icon={<Ionicons name="flame" size={iconSizes.lg} color={colors.warning} />}
-                        title="Streak"
-                        value={`${stats.streak} days`}
-                        color={colors.warning}
-                        iconBg="rgba(247, 127, 0, 0.12)"
-                    />
-                    <StatsCard
-                        icon={<Ionicons name="trophy" size={iconSizes.lg} color={colors.accentLight} />}
-                        title="Rank"
-                        value={`#${(user as any)?.rank || '-'}`}
-                        color={colors.accentLight}
-                        iconBg="rgba(149, 213, 178, 0.12)"
-                    />
-                </View>
-
-                {/* Animated Tree Visualization */}
-                <View style={styles.treeCard}>
-                    <Text style={styles.sectionTitle}>Your Impact Tree</Text>
-                    <Animated.View
-                        style={[
-                            styles.treeContainer,
-                            {
-                                transform: [{ scale: treeScale }],
-                            },
-                        ]}
-                    >
-                        <TouchableOpacity onPress={animateTree} activeOpacity={0.8}>
-                            {/* Replaced Emoji with Icon */}
-                            <MaterialCommunityIcons name="tree" size={120} color={colors.secondary} />
-                            <View style={styles.treeStats}>
-                                <Text style={styles.treeStatsText}>{stats.points} pts</Text>
-                            </View>
-                        </TouchableOpacity>
-                    </Animated.View>
-                    <Text style={styles.treeDescription}>
-                        Growing strong! Keep scanning to make it flourish.
-                    </Text>
-                </View>
-
-                {/* Scan Action Button - Hero CTA */}
+            {/* Header */}
+            <View style={[styles.header, { backgroundColor: colors.lightGray }]}>
                 <TouchableOpacity
-                    style={styles.scanButton}
-                    onPress={() => navigation.navigate('Scan')}
-                    activeOpacity={0.9}
+                    style={styles.profileButton}
+                    onPress={handleProfilePress}
                 >
-                    <LinearGradient
-                        colors={[colors.secondary, colors.secondaryLight, colors.accent]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.scanButtonGradient}
-                    >
-                        <View style={styles.scanIconContainer}>
-                            <MaterialCommunityIcons name="barcode-scan" size={iconSizes.xl} color={colors.white} />
-                        </View>
-                        <View style={styles.scanContent}>
-                            <Text style={styles.scanTitle}>Scan Plastic Now</Text>
-                            <Text style={styles.scanSubtitle}>Identify & recycle correctly</Text>
-                        </View>
-                        <Feather name="chevron-right" size={iconSizes.lg} color={colors.white} />
-                    </LinearGradient>
+                    <View style={styles.profileInitials}>
+                        <Text style={styles.profileInitialsText}>
+                            {user?.displayName?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U'}
+                        </Text>
+                    </View>
                 </TouchableOpacity>
 
-                {/* Weekly Challenge */}
-                <View style={styles.challengeCard}>
-                    <View style={styles.challengeHeader}>
-                        <View style={styles.challengeIcon}>
-                            <Feather name="target" size={iconSizes.md} color={colors.secondary} />
+                <View style={styles.headerRight}>
+                    <TouchableOpacity
+                        style={styles.energyButton}
+                        onPress={handleImpactPointsPress}
+                    >
+                        <View style={styles.energyIconContainer}>
+                            <Ionicons
+                                name="flash"
+                                size={28}
+                                color="#7fb069"
+                            />
+                            <View style={styles.pointsBadge}>
+                                <Text style={styles.pointsText}>{stats.scans}</Text>
+                            </View>
                         </View>
-                        <View style={styles.challengeContent}>
-                            <Text style={styles.challengeTitle}>Weekly Challenge</Text>
-                            <Text style={styles.challengeDescription}>Scan 20 items this week</Text>
-                        </View>
-                    </View>
-                    <View style={styles.progressContainer}>
-                        <View style={styles.progressBar}>
-                            <View style={[styles.progressFill, { width: `${(stats.scans % 20 / 20) * 100}%` }]} />
-                        </View>
-                        <Text style={styles.progressText}>{stats.scans % 20}/20</Text>
-                    </View>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.notificationButton}
+                        onPress={handleNotificationsPress}
+                    >
+                        <Ionicons name="notifications-outline" size={28} color="#7fb069" />
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            <ScrollView
+                style={[styles.scrollView, { backgroundColor: colors.lightGray }]}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+                }
+            >
+                {/* Today's Actions Section */}
+                <Text style={[styles.sectionHeader, { color: colors.textPrimary }]}>Today's Actions</Text>
+                <View style={styles.todayActionsContainer}>
+                    {todayActions.map((item) => (
+                        <TodayActionCard key={item.id} item={item} onPress={item.action} />
+                    ))}
                 </View>
 
-                {/* Recent Activity */}
-                <View style={styles.activitySection}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Recent Activity</Text>
-                        <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
-                            <Text style={styles.seeAllText}>See All</Text>
-                        </TouchableOpacity>
-                    </View>
-                    {[1, 2, 3].map((item) => (
-                        <ActivityItem key={item} />
+                {/* Impact Snapshot Section */}
+                <Text style={styles.sectionHeader}>Impact Snapshot</Text>
+                <View style={styles.impactSnapshotContainer}>
+                    <ImpactCard
+                        icon={require('../assets/icons/home-items_sorted.png')}
+                        label="Items Sorted"
+                        value={stats.scans}
+                    />
+                    <ImpactCard
+                        icon={require('../assets/icons/home-kg-plastic.png')}
+                        label="Plastic Saved"
+                        value={`${stats.plasticSaved} kg`}
+                    />
+                    <ImpactCard
+                        icon={require('../assets/icons/home-co2.png')}
+                        label="CO2 Reduced"
+                        value={`${stats.co2Saved}g`}
+                    />
+                </View>
+
+                {/* Carousel Section - Using FlatList instead of nested ScrollView */}
+                <View style={styles.carouselContainer}>
+                    <FlatList
+                        data={carouselData}
+                        renderItem={renderCarouselItem}
+                        keyExtractor={(item) => item.id}
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        snapToInterval={width * 0.92 + spacing.sm}
+                        decelerationRate="fast"
+                        contentContainerStyle={styles.carouselContent}
+                        getItemLayout={getItemLayout}
+                        removeClippedSubviews={true}
+                        maxToRenderPerBatch={2}
+                        initialNumToRender={2}
+                        windowSize={3}
+                    />
+                </View>
+
+                {/* Quick Actions Section */}
+                <Text style={styles.sectionHeader}>Quick Actions</Text>
+                <View style={styles.quickActionsContainer}>
+                    {quickActions.map((item) => (
+                        <QuickActionCard key={item.id} item={item} onPress={item.action} />
                     ))}
                 </View>
             </ScrollView>
@@ -225,330 +366,223 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     );
 }
 
-const StatsCard = ({ icon, title, value, color, iconBg }: any) => (
-    <View style={[styles.statsCard, shadows.sm]}>
-        <View style={[styles.statsIconContainer, { backgroundColor: iconBg }]}>
-            {icon}
-        </View>
-        <Text style={styles.statsValue}>{value}</Text>
-        <Text style={styles.statsTitle}>{title}</Text>
-    </View>
-);
-
-const ActivityItem = () => (
-    <View style={styles.activityItem}>
-        <View style={styles.activityIconContainer}>
-            <Ionicons name="water" size={iconSizes.md} color={colors.info} />
-        </View>
-        <View style={styles.activityContent}>
-            <Text style={styles.activityTitle}>PET Bottle scanned</Text>
-            <Text style={styles.activityTime}>2 hours ago</Text>
-        </View>
-        <Text style={styles.activityPoints}>+45 pts</Text>
-    </View>
-);
-
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.lightGray,
+        backgroundColor: '#e8e2d1',
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: spacing.lg,
+        paddingTop: spacing.xl,
+        paddingBottom: spacing.md,
+        backgroundColor: '#e8e2d1',
+    },
+    profileButton: {
+        padding: 0,
+    },
+    profileInitials: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: staticColors.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    profileInitialsText: {
+        fontSize: typography.fontSize.body,
+        fontWeight: typography.fontWeight.bold,
+        color: staticColors.white,
+    },
+    notificationButton: {
+        padding: spacing.xs,
+    },
+    bellIcon: {
+        width: 28,
+        height: 28,
+    },
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+    },
+    energyButton: {
+        padding: spacing.xs,
+    },
+    energyIconContainer: {
+        position: 'relative',
+    },
+    pointsBadge: {
+        position: 'absolute',
+        top: -4,
+        right: -8,
+        backgroundColor: '#7fb069',
+        borderRadius: 10,
+        minWidth: 20,
+        height: 20,
+        paddingHorizontal: 4,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+        borderColor: '#e8e2d1',
+    },
+    pointsText: {
+        fontSize: 10,
+        fontWeight: typography.fontWeight.bold,
+        color: staticColors.white,
     },
     scrollView: {
         flex: 1,
+        backgroundColor: staticColors.lightGray,
     },
     scrollContent: {
+        padding: spacing.md,
+        paddingTop: spacing.md,
         paddingBottom: spacing.xxxl,
     },
-    header: {
-        paddingTop: spacing.xxxl + spacing.md,
-        paddingBottom: spacing.xl,
-        paddingHorizontal: spacing.lg,
-        borderBottomLeftRadius: borderRadius.xxl,
-        borderBottomRightRadius: borderRadius.xxl,
-        marginBottom: spacing.lg,
-    },
-    headerContent: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: spacing.lg,
-    },
-    greeting: {
-        fontSize: typography.fontSize.body,
-        color: colors.accentLight,
-        fontWeight: typography.fontWeight.medium,
-    },
-    userName: {
-        fontSize: typography.fontSize.titleLarge,
-        fontWeight: typography.fontWeight.bold,
-        color: colors.white,
-        marginTop: spacing.xxs,
-    },
-    levelBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.xs,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
-        borderRadius: borderRadius.round,
-    },
-    levelText: {
-        fontSize: typography.fontSize.body,
-        fontWeight: typography.fontWeight.bold,
-        color: colors.white,
-    },
-    pointsCard: {
-        backgroundColor: colors.white,
-        borderRadius: borderRadius.xl,
-        padding: spacing.lg,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        ...shadows.md,
-    },
-    pointsContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.md,
-    },
-    pointsLabel: {
-        fontSize: typography.fontSize.caption,
-        color: colors.textSecondary,
-        fontWeight: typography.fontWeight.medium,
-    },
-    pointsValue: {
-        fontSize: typography.fontSize.headingLarge,
-        fontWeight: typography.fontWeight.bold,
-        color: colors.textPrimary,
-    },
-    pointsButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: colors.lightGray,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
-        borderRadius: borderRadius.md,
-        gap: spacing.xxs,
-    },
-    pointsButtonText: {
-        fontSize: typography.fontSize.caption,
-        fontWeight: typography.fontWeight.semiBold,
-        color: colors.secondary,
-    },
-    statsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: spacing.md,
-        paddingHorizontal: spacing.lg,
-        marginBottom: spacing.lg,
-    },
-    statsCard: {
-        flex: 1,
-        minWidth: '46%',
-        backgroundColor: colors.white,
-        borderRadius: borderRadius.xl,
-        padding: spacing.lg,
-        alignItems: 'center',
-    },
-    statsIconContainer: {
-        width: 56,
-        height: 56,
-        borderRadius: borderRadius.md,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: spacing.sm,
-    },
-    statsValue: {
-        fontSize: typography.fontSize.headingLarge,
-        fontWeight: typography.fontWeight.bold,
-        color: colors.textPrimary,
-        marginBottom: spacing.xxs,
-    },
-    statsTitle: {
-        fontSize: typography.fontSize.caption,
-        color: colors.textSecondary,
-        fontWeight: typography.fontWeight.medium,
-    },
-    treeCard: {
-        backgroundColor: colors.white,
-        borderRadius: borderRadius.xl,
-        padding: spacing.xl,
-        alignItems: 'center',
-        marginHorizontal: spacing.lg,
-        marginBottom: spacing.lg,
-        ...shadows.sm,
-    },
-    sectionTitle: {
+    sectionHeader: {
         fontSize: typography.fontSize.heading,
-        fontWeight: typography.fontWeight.bold,
-        color: colors.textPrimary,
-    },
-    treeContainer: {
-        marginVertical: spacing.lg,
-        alignItems: 'center',
-    },
-    treeStats: {
-        position: 'absolute',
-        bottom: -10,
-        alignSelf: 'center',
-        backgroundColor: colors.secondary,
-        borderRadius: borderRadius.round,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
-        ...shadows.sm,
-    },
-    treeStatsText: {
-        color: colors.white,
-        fontSize: typography.fontSize.caption,
-        fontWeight: typography.fontWeight.bold,
-    },
-    treeDescription: {
-        fontSize: typography.fontSize.caption,
-        color: colors.textSecondary,
-        textAlign: 'center',
+        fontWeight: typography.fontWeight.semiBold,
+        color: staticColors.textPrimary,
+        marginBottom: spacing.sm,
         marginTop: spacing.md,
     },
-    scanButton: {
-        borderRadius: borderRadius.xl,
-        overflow: 'hidden',
-        marginHorizontal: spacing.lg,
-        marginBottom: spacing.lg,
-        ...shadows.lg,
-    },
-    scanButtonGradient: {
+
+    // Today's Actions Styles
+    todayActionsContainer: {
         flexDirection: 'row',
-        padding: spacing.lg,
-        alignItems: 'center',
-        gap: spacing.md,
-    },
-    scanIconContainer: {
-        width: 60,
-        height: 60,
-        borderRadius: borderRadius.md,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    scanContent: {
-        flex: 1,
-    },
-    scanTitle: {
-        fontSize: typography.fontSize.headingLarge,
-        fontWeight: typography.fontWeight.bold,
-        color: colors.white,
-        marginBottom: spacing.xxs,
-    },
-    scanSubtitle: {
-        fontSize: typography.fontSize.caption,
-        color: 'rgba(255, 255, 255, 0.9)',
-    },
-    challengeCard: {
-        backgroundColor: colors.white,
-        borderRadius: borderRadius.xl,
-        padding: spacing.lg,
-        marginHorizontal: spacing.lg,
-        marginBottom: spacing.lg,
-        ...shadows.sm,
-    },
-    challengeHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
+        gap: spacing.sm,
         marginBottom: spacing.md,
-        gap: spacing.md,
     },
-    challengeIcon: {
+    todayActionCard: {
+        flex: 1,
+        backgroundColor: staticColors.todayActionsCard,
+        borderRadius: borderRadius.xl,
+        padding: spacing.md,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        minHeight: 120,
+    },
+    todayActionIcon: {
         width: 48,
         height: 48,
-        borderRadius: borderRadius.md,
-        backgroundColor: 'rgba(64, 145, 108, 0.12)',
-        justifyContent: 'center',
-        alignItems: 'center',
+        marginBottom: spacing.xs,
     },
-    challengeContent: {
-        flex: 1,
+    todayActionText: {
+        fontSize: typography.fontSize.small,
+        fontWeight: typography.fontWeight.semiBold,
+        color: staticColors.textPrimary,
+        textAlign: 'center',
     },
-    challengeTitle: {
-        fontSize: typography.fontSize.body,
-        fontWeight: typography.fontWeight.bold,
-        color: colors.textPrimary,
-        marginBottom: spacing.xxs,
-    },
-    challengeDescription: {
-        fontSize: typography.fontSize.caption,
-        color: colors.textSecondary,
-    },
-    progressContainer: {
+
+    // Impact Snapshot Styles - Made responsive for desktop
+    impactSnapshotContainer: {
         flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.md,
-    },
-    progressBar: {
-        flex: 1,
-        height: 8,
-        backgroundColor: colors.lightGray,
-        borderRadius: borderRadius.round,
-        overflow: 'hidden',
-    },
-    progressFill: {
-        height: '100%',
-        backgroundColor: colors.secondary,
-        borderRadius: borderRadius.round,
-    },
-    progressText: {
-        fontSize: typography.fontSize.caption,
-        fontWeight: typography.fontWeight.bold,
-        color: colors.textSecondary,
-    },
-    activitySection: {
-        paddingHorizontal: spacing.lg,
-        marginBottom: spacing.lg,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        gap: spacing.sm,
         marginBottom: spacing.md,
     },
-    seeAllText: {
-        fontSize: typography.fontSize.caption,
-        color: colors.secondary,
-        fontWeight: typography.fontWeight.semiBold,
-    },
-    activityItem: {
-        backgroundColor: colors.white,
-        borderRadius: borderRadius.lg,
-        padding: spacing.md,
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: spacing.sm,
-        ...shadows.xs,
-    },
-    activityIconContainer: {
-        width: 44,
-        height: 44,
-        borderRadius: borderRadius.md,
-        backgroundColor: 'rgba(76, 201, 240, 0.12)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: spacing.md,
-    },
-    activityContent: {
+    impactCard: {
         flex: 1,
+        backgroundColor: staticColors.impactSnapshotCard,
+        borderRadius: borderRadius.xl,
+        padding: spacing.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+        // Remove aspectRatio for mobile, set maxHeight for desktop
+        ...(Platform.OS === 'web' ? {
+            maxHeight: 140,
+            minHeight: 120,
+        } : {
+            aspectRatio: 1,
+        }),
     },
-    activityTitle: {
-        fontSize: typography.fontSize.body,
+    impactIcon: {
+        width: 40,
+        height: 40,
+        marginBottom: spacing.xs,
+    },
+    impactLabel: {
+        fontSize: typography.fontSize.xs,
         fontWeight: typography.fontWeight.semiBold,
-        color: colors.textPrimary,
+        color: staticColors.textPrimary,
+        textAlign: 'center',
         marginBottom: spacing.xxs,
     },
-    activityTime: {
-        fontSize: typography.fontSize.small,
-        color: colors.textSecondary,
-    },
-    activityPoints: {
+    impactValue: {
         fontSize: typography.fontSize.body,
         fontWeight: typography.fontWeight.bold,
-        color: colors.secondary,
+        color: staticColors.textPrimary,
+        textAlign: 'center',
+    },
+
+    // Carousel Styles
+    carouselContainer: {
+        marginTop: spacing.xl,
+        marginBottom: spacing.md,
+        marginHorizontal: -spacing.md,
+    },
+    carouselContent: {
+        paddingHorizontal: spacing.md,
+        gap: spacing.sm,
+    },
+    carouselCard: {
+        width: width * 0.92,
+        height: 160,
+        borderRadius: borderRadius.xl,
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: spacing.lg,
+        marginRight: spacing.sm,
+    },
+    carouselTextContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        paddingRight: spacing.sm,
+    },
+    carouselHeading: {
+        fontSize: typography.fontSize.bodyLarge,
+        fontWeight: typography.fontWeight.semiBold,
+        color: staticColors.textPrimary,
+        marginBottom: spacing.sm,
+        marginTop: spacing.xs,
+    },
+    carouselSubheading: {
+        fontSize: typography.fontSize.body,
+        fontWeight: typography.fontWeight.medium,
+        color: staticColors.textSecondary,
+        lineHeight: typography.fontSize.body * 1.4,
+    },
+    carouselImage: {
+        width: 100,
+        height: 100,
+    },
+
+    // Quick Actions Styles
+    quickActionsContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: spacing.sm,
+        marginBottom: spacing.lg,
+    },
+    quickActionCard: {
+        width: (width - spacing.md * 2 - spacing.sm * 2) / 3,
+        backgroundColor: staticColors.quickActionsCard,
+        borderRadius: borderRadius.xl,
+        padding: spacing.lg,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    quickActionIcon: {
+        width: 44,
+        height: 44,
+        marginBottom: spacing.sm,
+    },
+    quickActionText: {
+        fontSize: typography.fontSize.small,
+        fontWeight: typography.fontWeight.semiBold,
+        color: staticColors.textPrimary,
+        textAlign: 'center',
     },
 });

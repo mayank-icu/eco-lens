@@ -101,6 +101,7 @@ export const getUserData = async (uid: string): Promise<User | null> => {
             ...data,
             createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
             lastActiveDate: data.lastActiveDate?.toDate ? data.lastActiveDate.toDate() : (data.lastActiveDate ? new Date(data.lastActiveDate) : undefined),
+            lastClaimDate: data.lastClaimDate?.toDate ? data.lastClaimDate.toDate() : (data.lastClaimDate ? new Date(data.lastClaimDate) : undefined),
         } as User;
     }
 

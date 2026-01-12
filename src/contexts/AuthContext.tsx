@@ -8,9 +8,11 @@ interface AuthContextType {
     user: User | null;
     firebaseUser: FirebaseUser | null;
     loading: boolean;
-    refreshUser: () => Promise<void>;
+    refreshUser: (uid?: string) => Promise<void>;
     loginAsGuest: () => Promise<void>;
     updateUser: (data: Partial<User>) => void;
+    updateProfilePicture: (index: number) => Promise<void>;
+    deleteAccount: (password: string) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType>({
@@ -20,6 +22,8 @@ export const AuthContext = createContext<AuthContextType>({
     refreshUser: async () => { },
     loginAsGuest: async () => { },
     updateUser: () => { },
+    updateProfilePicture: async () => { },
+    deleteAccount: async () => { },
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -29,9 +33,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
     const [loading, setLoading] = useState(true);
 
-    const refreshUser = async () => {
-        if (firebaseUser) {
-            const userData = await getUserData(firebaseUser.uid);
+    const refreshUser = async (uid?: string) => {
+        const targetUid = uid || firebaseUser?.uid;
+        if (targetUid) {
+            const userData = await getUserData(targetUid);
             setUser(userData);
         }
     };
@@ -45,7 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const loginAsGuest = async () => {
         const guestUser: User = {
             uid: 'guest-' + Date.now(),
-            email: 'guest@plastisort.ai',
+            email: 'guest@e',
             displayName: 'Guest User',
             photoURL: null,
             school: null,
@@ -60,6 +65,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             isGuest: true,
         };
         setUser(guestUser);
+    };
+
+    const updateProfilePicture = async (pictureIndex: number) => {
+        if (!firebaseUser || !user) return;
+
+        try {
+            const { doc, updateDoc } = await import('firebase/firestore');
+            const { db } = await import('../services/firebase');
+
+            const photoURL = `pf/${pictureIndex + 1}.png`;
+            const userRef = doc(db, 'users', firebaseUser.uid);
+            await updateDoc(userRef, { photoURL });
+
+            setUser(prev => prev ? { ...prev, photoURL } : null);
+        } catch (error) {
+            console.error('Profile picture update error:', error);
+            throw error;
+        }
+    };
+
+    const deleteAccount = async (password: string) => {
+        if (!firebaseUser) return;
+
+        try {
+            const { doc, deleteDoc } = await import('firebase/firestore');
+            const { db } = await import('../services/firebase');
+            const { deleteUser, EmailAuthProvider, reauthenticateWithCredential } = await import('firebase/auth');
+
+            const credential = EmailAuthProvider.credential(firebaseUser.email!, password);
+            await reauthenticateWithCredential(firebaseUser, credential);
+
+            const userRef = doc(db, 'users', firebaseUser.uid);
+            await deleteDoc(userRef);
+
+            await deleteUser(firebaseUser);
+
+            setUser(null);
+            setFirebaseUser(null);
+        } catch (error) {
+            console.error('Delete account error:', error);
+            throw error;
+        }
     };
 
     useEffect(() => {
@@ -87,7 +134,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, firebaseUser, loading, refreshUser, loginAsGuest, updateUser }}>
+        <AuthContext.Provider value={{
+            user,
+            firebaseUser,
+            loading,
+            refreshUser,
+            loginAsGuest,
+            updateUser,
+            updateProfilePicture,
+            deleteAccount
+        }}>
             {children}
         </AuthContext.Provider>
     );

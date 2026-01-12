@@ -1,4 +1,7 @@
-// Plastic types mapping based on model output index
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import { uploadToCloudinary, deleteFromCloudinary } from './cloudinary';
+
+// Plastic types mapping
 export const PLASTIC_CLASSES = [
     { id: 'PET', name: 'PET', binColor: 'green', description: 'Polyethylene Terephthalate' },
     { id: 'HDPE', name: 'HDPE', binColor: 'green', description: 'High-Density Polyethylene' },
@@ -8,69 +11,147 @@ export const PLASTIC_CLASSES = [
     { id: 'PS', name: 'PS', binColor: 'red', description: 'Polystyrene' },
 ];
 
-let model: any = null;
+const OLA_KRUTRIM_API_KEY = 'C2MeMjL7jQB63OfrITmBWyJGF';
+const OLA_KRUTRIM_URL = 'https://cloud.olakrutrim.com/v1/chat/completions';
 
 export const loadModel = async (): Promise<boolean> => {
-    try {
-        if (model) return true;
+    return true;
+};
 
-        console.log('Loading model...');
-        // Dynamic import to avoid startup crashes if native module is missing
-        try {
-            const { loadTensorflowModel } = require('react-native-fast-tflite');
-            model = await loadTensorflowModel(require('../../assets/models/plasti_sort_v1.tflite'));
-            console.log('Model loaded successfully');
-            return true;
-        } catch (e) {
-            console.warn('Native TFLite module not found (likely running in Expo Go). Falling back to mock inference.');
-            return true; // Return true to allow app to function with mock data
-        }
+const compressImage = async (uri: string) => {
+    try {
+        const result = await manipulateAsync(
+            uri,
+            [{ resize: { width: 512 } }], // Resize to 512px width (maintain aspect ratio)
+            { compress: 0.7, format: SaveFormat.JPEG } // Compress to 70% quality
+        );
+        return result.uri;
     } catch (error) {
-        console.error('Error loading model:', error);
-        return false;
+        return uri; // Fallback to original if compression fails
     }
 };
 
 export const runInference = async (imageUri: string) => {
-    if (!model) {
-        console.error('Model not loaded');
-        return null;
-    }
+    let uploadedPublicId: string | null = null;
+    let deleteToken: string | undefined;
 
     try {
-        // Placeholder for image preprocessing
-        // In a real implementation, you would:
-        // 1. Resize image to 640x640
-        // 2. Convert to Float32 array (normalized 0-1)
-        // 3. Create tensor
+        // 1. Compress Image (Client-side optimization)
+        const compressedUri = await compressImage(imageUri);
 
-        // Since we can't easily do complex image processing in JS without extra native libs like 
-        // react-native-vision-camera's frame processors or react-native-image-manipulator + custom code,
-        // we will simulate the inference result for this demo if the model is loaded.
+        // 2. Upload to Cloudinary
+        const uploadResult = await uploadToCloudinary(compressedUri);
+        uploadedPublicId = uploadResult.publicId;
+        deleteToken = uploadResult.deleteToken;
 
-        // However, the actual call would look like this:
-        // const inputTensor = ...; 
-        // const output = await model.run([inputTensor]);
+        // 3. Call Ola Krutrim AI
+        const aiResult = await analyzeWithOlaKrutrim(uploadResult.url);
 
-        // For the purpose of this task which focuses on integration structure:
-        console.log('Running inference on:', imageUri);
-
-        // Simulate processing delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // Return a random result for demonstration until we have the full image processing pipeline
-        const randomIndex = Math.floor(Math.random() * PLASTIC_CLASSES.length);
-        const confidence = 0.7 + Math.random() * 0.25;
-
-        return {
-            plasticType: PLASTIC_CLASSES[randomIndex].id,
-            confidence: confidence,
-            binColor: PLASTIC_CLASSES[randomIndex].binColor,
-            name: PLASTIC_CLASSES[randomIndex].name
-        };
+        return aiResult;
 
     } catch (error) {
-        console.error('Error running inference:', error);
         return null;
+    } finally {
+        // 4. Cleanup (Auto-delete)
+        if (uploadedPublicId && deleteToken) {
+            deleteFromCloudinary(uploadedPublicId, deleteToken).catch(() => { });
+        }
     }
 };
+
+async function analyzeWithOlaKrutrim(imageUrl: string) {
+    // Optimized prompt for token efficiency and recycling awareness
+    const prompt = `
+    Analyze this image. Is it a plastic item?
+    If YES, identify type (PET, HDPE, PVC, LDPE, PP, PS).
+    If NO (e.g. paper, metal, glass, organic, screenshot, text, digital art, person, black screen, blurry), set id="NOT_PLASTIC".
+    
+    Return strict JSON:
+    {
+        "id": "TYPE_OR_NOT_PLASTIC_OR_UNKNOWN",
+        "confidence": 0.0-1.0,
+        "name": "Item Name",
+        "description": "Brief ID reason",
+        "recycling_tip": "Specific recycling tip for this item type. If NOT_PLASTIC, explain why it's not plastic."
+    }
+    `;
+
+    try {
+        const response = await fetch(OLA_KRUTRIM_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${OLA_KRUTRIM_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: "Gemma-3-27B-IT",
+                messages: [
+                    {
+                        role: "user",
+                        content: [
+                            { type: "text", text: prompt },
+                            { type: "image_url", image_url: { url: imageUrl } }
+                        ]
+                    }
+                ],
+                max_tokens: 200,
+                temperature: 0.1
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Ola Krutrim API Error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content;
+
+        if (!content) throw new Error('No content in AI response');
+
+        // Parse JSON from response
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        const jsonString = jsonMatch ? jsonMatch[0] : content;
+        const result = JSON.parse(jsonString);
+
+        if (result.id === 'NOT_PLASTIC') {
+            return {
+                plasticType: 'Not Plastic',
+                confidence: result.confidence || 0.9,
+                binColor: 'gray',
+                name: result.name || 'Non-Plastic Item',
+                educationalInfo: result.description || "This item does not appear to be plastic.",
+                recyclable: false,
+                isPlastic: false
+            };
+        }
+
+        // Map to our app's format
+        const plasticClass = PLASTIC_CLASSES.find(p => p.id === result.id);
+
+        if (plasticClass) {
+            return {
+                plasticType: plasticClass.id,
+                confidence: result.confidence || 0.8,
+                binColor: plasticClass.binColor,
+                name: result.name || plasticClass.name,
+                educationalInfo: `${result.description} ${result.recycling_tip ? `\n\n♻️ Tip: ${result.recycling_tip}` : ''}`,
+                recyclable: plasticClass.binColor === 'green',
+                isPlastic: true
+            };
+        } else {
+            // Handle UNKNOWN or unmapped types
+            return {
+                plasticType: 'Unknown',
+                confidence: result.confidence || 0.5,
+                binColor: 'gray',
+                name: result.name || 'Unknown Item',
+                educationalInfo: result.description || "Could not identify the plastic type. Please check the recycling code manually.",
+                recyclable: false,
+                isPlastic: false // Treat unknown as potentially not plastic for safety, or just unknown
+            };
+        }
+
+    } catch (error) {
+        throw error;
+    }
+}

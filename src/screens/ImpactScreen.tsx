@@ -1,336 +1,574 @@
-import React from 'react';
+import React, { useContext, useMemo, useState, useCallback, memo } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     ScrollView,
     StatusBar,
-    Dimensions,
+    TouchableOpacity,
+    Image,
+    FlatList,
 } from 'react-native';
-import { useAuth } from '../contexts/AuthContext';
-import { colors, spacing, typography, borderRadius, shadows } from '../constants/theme';
-
-const { width } = Dimensions.get('window');
-
-export default function ImpactScreen() {
-    const { user } = useAuth();
-
-    return (
-        <View style={styles.container}>
-            <StatusBar barStyle="light-content" />
-
-            {/* Header */}
-            <View style={styles.header}>
-                <Text style={styles.title}>Your Impact</Text>
-                <Text style={styles.subtitle}>Making the world greener  🌍</Text>
-            </View>
-
-            <ScrollView style={styles.content}>
-                {/* Hero Points */}
-                <View style={styles.heroCard}>
-                    <Text style={styles.heroLabel}>Total Impact Points</Text>
-                    <Text style={styles.heroValue}>{user?.totalPoints || 0}</Text>
-                    <Text style={styles.heroTrend}>+12 this week 📈</Text>
-                </View>
-
-                {/* Impact Breakdown */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Impact Breakdown</Text>
-                    <View style={styles.statsGrid}>
-                        <ImpactCard
-                            icon="📦"
-                            value={user?.totalScans || 0}
-                            label="Items Scanned"
-                            trend="+5"
-                        />
-                        <ImpactCard
-                            icon="⚖️"
-                            value="2.4kg"
-                            label="Weight Sorted"
-                            trend="+0.8kg"
-                        />
-                        <ImpactCard
-                            icon="🌱"
-                            value={`${(user?.co2Saved || 0).toFixed(1)}kg`}
-                            label="CO2 Saved"
-                            trend={`+${((user?.co2Saved || 0) * 0.1).toFixed(1)}kg`}
-                        />
-                        <ImpactCard
-                            icon="🌊"
-                            value="1.2kg"
-                            label="Ocean Saved"
-                            trend="+0.4kg"
-                        />
-                    </View>
-                </View>
-
-                {/* Plastic Distribution */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Plastic Types Distribution</Text>
-                    <View style={styles.chartContainer}>
-                        <PlasticBar label="PET" percentage={45} color={colors.secondary} />
-                        <PlasticBar label="HDPE" percentage={30} color={colors.accent} />
-                        <PlasticBar label="PP" percentage={15} color={colors.warning} />
-                        <PlasticBar label="Other" percentage={10} color={colors.textSecondary} />
-                    </View>
-                </View>
-
-                {/* Milestones */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Milestones</Text>
-                    <MilestoneItem
-                        title="Beginner"
-                        description="Scan 50 items"
-                        progress={user ? (user.totalScans / 50) * 100 : 0}
-                        completed={(user?.totalScans || 0) >= 50}
-                    />
-                    <MilestoneItem
-                        title="Eco Warrior"
-                        description="Scan 200 items"
-                        progress={user ? (user.totalScans / 200) * 100 : 0}
-                        completed={(user?.totalScans || 0) >= 200}
-                    />
-                    <MilestoneItem
-                        title="Planet Saver"
-                        description="Scan 500 items"
-                        progress={user ? (user.totalScans / 500) * 100 : 0}
-                        completed={(user?.totalScans || 0) >= 500}
-                    />
-                </View>
-
-                {/* Comparison */}
-                <View style={styles.comparisonCard}>
-                    <Text style={styles.comparisonText}>
-                        You sorted <Text style={styles.comparisonValue}>23%</Text> more than last month! 🎉
-                    </Text>
-                </View>
-
-                <View style={styles.spacer} />
-            </ScrollView>
-        </View>
-    );
-}
-
-const ImpactCard = ({ icon, value, label, trend }: any) => (
-    <View style={styles.impactCard}>
-        <Text style={styles.impactIcon}>{icon}</Text>
-        <Text style={styles.impactValue}>{value}</Text>
-        <Text style={styles.impactLabel}>{label}</Text>
-        <Text style={styles.impactTrend}>{trend}</Text>
-    </View>
-);
-
-const PlasticBar = ({ label, percentage, color }: any) => (
-    <View style={styles.barContainer}>
-        <Text style={styles.barLabel}>{label}</Text>
-        <View style={styles.barTrack}>
-            <View style={[styles.barFill, { width: `${percentage}%`, backgroundColor: color }]} />
-        </View>
-        <Text style={styles.barPercentage}>{percentage}%</Text>
-    </View>
-);
-
-const MilestoneItem = ({ title, description, progress, completed }: any) => (
-    <View style={styles.milestoneItem}>
-        <View style={styles.milestoneIcon}>
-            <Text>{completed ? '✅' : '🔒'}</Text>
-        </View>
-        <View style={styles.milestoneContent}>
-            <Text style={styles.milestoneTitle}>{title}</Text>
-            <Text style={styles.milestoneDescription}>{description}</Text>
-            <View style={styles.milestoneProgress}>
-                <View style={[styles.milestoneBar, { width: `${Math.min(progress, 100)}%` }]} />
-            </View>
-            <Text style={styles.milestonePercentage}>{Math.round(progress)}%</Text>
-        </View>
-    </View>
-);
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { AuthContext } from '../contexts/AuthContext';
+import { GamificationContext } from '../contexts/GamificationContext';
+import { colors, spacing, typography, borderRadius } from '../constants/theme';
+import { badges, Badge } from '../constants/badges';
+import { StampDetailModal } from '../components/StampDetailModal';
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.primary,
+        backgroundColor: '#e8e2d1',
     },
     header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         paddingHorizontal: spacing.lg,
-        paddingTop: spacing.xxl * 1.5,
+        paddingTop: spacing.xl,
+        paddingBottom: spacing.md,
+        backgroundColor: '#e8e2d1',
+    },
+    backButton: {
+        padding: spacing.xs,
+    },
+    headerTitle: {
+        fontSize: typography.fontSize.heading,
+        fontWeight: typography.fontWeight.bold,
+        color: colors.textPrimary,
+    },
+    headerSpacer: {
+        width: 40,
+    },
+    scrollView: {
+        flex: 1,
+        backgroundColor: colors.lightGray,
+    },
+    scrollContent: {
+        padding: spacing.md,
         paddingBottom: spacing.lg,
     },
-    title: {
-        fontSize: typography.fontSize.title,
-        fontWeight: typography.fontWeight.bold,
-        color: colors.white,
+    sectionHeader: {
+        fontSize: typography.fontSize.heading,
+        fontWeight: typography.fontWeight.semiBold,
+        color: colors.textPrimary,
+        marginBottom: spacing.sm,
+        marginTop: spacing.md,
     },
-    subtitle: {
-        fontSize: typography.fontSize.body,
-        color: colors.accent,
-        marginTop: spacing.xs,
+
+    // Your Contribution Styles
+    contributionContainer: {
+        flexDirection: 'row',
+        gap: spacing.sm,
+        marginBottom: spacing.md,
     },
-    content: {
+    contributionCard: {
         flex: 1,
-        backgroundColor: colors.white,
-        borderTopLeftRadius: borderRadius.xl * 1.5,
-        borderTopRightRadius: borderRadius.xl * 1.5,
-        paddingHorizontal: spacing.lg,
-        paddingTop: spacing.lg,
-    },
-    heroCard: {
-        backgroundColor: colors.secondary,
         borderRadius: borderRadius.xl,
-        padding: spacing.xl,
-        alignItems: 'center',
-        marginBottom: spacing.lg,
-        ...shadows.md,
-    },
-    heroLabel: {
-        fontSize: typography.fontSize.body,
-        color: colors.white,
-        opacity: 0.9,
-    },
-    heroValue: {
-        fontSize: 48,
-        fontWeight: typography.fontWeight.bold,
-        color: colors.white,
-        marginVertical: spacing.sm,
-    },
-    heroTrend: {
-        fontSize: typography.fontSize.caption,
-        color: colors.white,
-        opacity: 0.9,
-    },
-    section: {
-        marginBottom: spacing.lg,
-    },
-    sectionTitle: {
-        fontSize: typography.fontSize.heading,
-        fontWeight: typography.fontWeight.semiBold,
-        color: colors.textPrimary,
-        marginBottom: spacing.md,
-    },
-    statsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: spacing.md,
-    },
-    impactCard: {
-        flex: 1,
-        minWidth: '45%',
-        backgroundColor: colors.lightGray,
-        borderRadius: borderRadius.lg,
-        padding: spacing.md,
+        padding: spacing.lg,
         alignItems: 'center',
     },
-    impactIcon: {
-        fontSize: 32,
+    contributionIcon: {
+        width: 48,
+        height: 48,
         marginBottom: spacing.sm,
     },
-    impactValue: {
+    contributionValue: {
         fontSize: typography.fontSize.heading,
         fontWeight: typography.fontWeight.bold,
         color: colors.textPrimary,
     },
-    impactLabel: {
-        fontSize: typography.fontSize.caption,
-        color: colors.textSecondary,
-        marginTop: spacing.xs,
-    },
-    impactTrend: {
+    contributionUnit: {
         fontSize: typography.fontSize.small,
-        color: colors.secondary,
-        marginTop: spacing.xs,
-    },
-    chartContainer: {
-        gap: spacing.md,
-    },
-    barContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.md,
-    },
-    barLabel: {
-        width: 50,
-        fontSize: typography.fontSize.caption,
         fontWeight: typography.fontWeight.medium,
-        color: colors.textPrimary,
-    },
-    barTrack: {
-        flex: 1,
-        height: 24,
-        backgroundColor: colors.lightGray,
-        borderRadius: borderRadius.sm,
-        overflow: 'hidden',
-    },
-    barFill: {
-        height: '100%',
-        borderRadius: borderRadius.sm,
-    },
-    barPercentage: {
-        width: 40,
-        fontSize: typography.fontSize.caption,
         color: colors.textSecondary,
-        textAlign: 'right',
-    },
-    milestoneItem: {
-        flexDirection: 'row',
-        backgroundColor: colors.lightGray,
-        borderRadius: borderRadius.lg,
-        padding: spacing.md,
-        marginBottom: spacing.md,
-    },
-    milestoneIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: borderRadius.round,
-        backgroundColor: colors.white,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: spacing.md,
-    },
-    milestoneContent: {
-        flex: 1,
-    },
-    milestoneTitle: {
-        fontSize: typography.fontSize.body,
-        fontWeight: typography.fontWeight.semiBold,
-        color: colors.textPrimary,
-    },
-    milestoneDescription: {
-        fontSize: typography.fontSize.caption,
-        color: colors.textSecondary,
-        marginTop: spacing.xs / 2,
-        marginBottom: spacing.sm,
-    },
-    milestoneProgress: {
-        height: 6,
-        backgroundColor: colors.white,
-        borderRadius: borderRadius.sm,
         marginBottom: spacing.xs,
     },
-    milestoneBar: {
-        height: '100%',
-        backgroundColor: colors.secondary,
-        borderRadius: borderRadius.sm,
-    },
-    milestonePercentage: {
+    contributionLabel: {
         fontSize: typography.fontSize.small,
-        color: colors.textSecondary,
-    },
-    comparisonCard: {
-        backgroundColor: colors.accent + '20',
-        padding: spacing.lg,
-        borderRadius: borderRadius.lg,
-        marginBottom: spacing.lg,
-    },
-    comparisonText: {
-        fontSize: typography.fontSize.body,
+        fontWeight: typography.fontWeight.semiBold,
         color: colors.textPrimary,
+        marginBottom: spacing.sm,
         textAlign: 'center',
     },
-    comparisonValue: {
-        fontWeight: typography.fontWeight.bold,
-        color: colors.secondary,
+    contributionDescription: {
+        fontSize: typography.fontSize.small,
+        fontWeight: typography.fontWeight.regular,
+        color: colors.textSecondary,
+        textAlign: 'center',
+        lineHeight: typography.fontSize.small * 1.4,
     },
-    spacer: {
-        height: spacing.xl,
+
+    // Weekly Progress Styles
+    weeklyGraphCard: {
+        backgroundColor: 'transparent',
+        borderRadius: borderRadius.xl,
+        padding: spacing.md,
+        paddingLeft: 0,
+        marginBottom: spacing.md,
+    },
+    graphContainer: {
+        flexDirection: 'row',
+        height: 180,
+    },
+    yAxisContainer: {
+        width: 28,
+        height: 150,
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginRight: spacing.xs,
+    },
+    yAxisLabel: {
+        fontSize: typography.fontSize.xs,
+        fontWeight: typography.fontWeight.medium,
+        color: colors.textSecondary,
+    },
+    graphContent: {
+        flex: 1,
+        height: 180,
+        position: 'relative',
+    },
+    gridLinesContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 150,
+        justifyContent: 'space-between',
+    },
+    gridLine: {
+        height: 1,
+        backgroundColor: '#e8e8e8',
+        width: '100%',
+    },
+    barsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        alignItems: 'flex-end',
+        height: 180,
+        paddingTop: 0,
+    },
+    barColumn: {
+        flex: 1,
+        alignItems: 'center',
+        height: 180,
+    },
+    barContainer: {
+        width: '100%',
+        height: 150,
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+    },
+    barWrapper: {
+        width: '100%',
+        flex: 1,
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+    },
+    bar: {
+        width: '70%',
+        borderRadius: borderRadius.sm,
+        minHeight: 4,
+    },
+    verticalLine: {
+        width: 1,
+        height: 8,
+        backgroundColor: '#e8e8e8',
+    },
+    dayLabel: {
+        fontSize: typography.fontSize.xs,
+        fontWeight: typography.fontWeight.medium,
+        color: colors.textSecondary,
+        marginTop: spacing.xxs,
+    },
+
+    // Achievements Styles
+    achievementsContainer: {
+        marginBottom: spacing.md,
+    },
+    stampsRow: {
+        justifyContent: 'flex-start',
+        gap: spacing.sm,
+        marginBottom: spacing.sm,
+    },
+    stampContainer: {
+        alignItems: 'center',
+        width: '31%',
+        backgroundColor: colors.white,
+        borderRadius: borderRadius.lg,
+        padding: spacing.sm,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    stampImage: {
+        width: 70,
+        height: 70,
+    },
+    imageWrapper: {
+        position: 'relative',
+        marginBottom: spacing.xs,
+        width: 70,
+        height: 70,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    notificationDot: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: '#EF4444',
+        borderWidth: 2,
+        borderColor: colors.white,
+        zIndex: 2,
+    },
+    stampName: {
+        fontSize: typography.fontSize.xs,
+        fontWeight: typography.fontWeight.semiBold,
+        color: colors.textPrimary,
+        textAlign: 'center',
+        lineHeight: typography.fontSize.xs * 1.3,
+    },
+    stampNameLocked: {
+        color: colors.textSecondary,
+    },
+    viewAllButton: {
+        backgroundColor: colors.white,
+        borderRadius: borderRadius.lg,
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.lg,
+        alignItems: 'center',
+        marginTop: spacing.md,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: spacing.xs,
+        borderWidth: 1,
+        borderColor: '#e3eae0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    viewAllButtonText: {
+        fontSize: typography.fontSize.small,
+        fontWeight: typography.fontWeight.semiBold,
+        color: '#7fb069',
+    },
+
+    // Inspiration Card Styles
+    inspirationCard: {
+        borderRadius: borderRadius.xl,
+        padding: spacing.lg,
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: spacing.lg,
+        marginBottom: spacing.md,
+    },
+    inspirationTextContainer: {
+        flex: 1,
+        paddingRight: spacing.sm,
+    },
+    inspirationHeading: {
+        fontSize: typography.fontSize.body,
+        fontWeight: typography.fontWeight.semiBold,
+        color: colors.textPrimary,
+        marginBottom: spacing.xxs,
+    },
+    inspirationSubheading: {
+        fontSize: typography.fontSize.small,
+        fontWeight: typography.fontWeight.regular,
+        color: colors.textSecondary,
+        lineHeight: typography.fontSize.small * 1.4,
+    },
+    inspirationImage: {
+        width: 80,
+        height: 80,
     },
 });
+
+// Memoized components for better performance
+const ContributionCard = memo(({ icon, value, unit, label, description }: any) => (
+    <LinearGradient
+        colors={['#f5f9f3', '#d4e8d0']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.contributionCard}
+    >
+        <Image
+            source={icon}
+            style={styles.contributionIcon}
+            resizeMode="contain"
+            fadeDuration={0}
+        />
+        <Text style={styles.contributionValue}>{value}</Text>
+        <Text style={styles.contributionUnit}>{unit}</Text>
+        <Text style={styles.contributionLabel}>{label}</Text>
+        <Text style={styles.contributionDescription}>{description}</Text>
+    </LinearGradient>
+));
+
+const WeeklyBar = memo(({ item, maxValue, getBarColor }: any) => (
+    <View style={styles.barColumn}>
+        <View style={styles.barContainer}>
+            <View style={styles.barWrapper}>
+                <View
+                    style={[
+                        styles.bar,
+                        {
+                            height: item.value > 0 ? `${(item.value / maxValue) * 100}%` : 0,
+                            backgroundColor: getBarColor(item.value),
+                        },
+                    ]}
+                />
+            </View>
+        </View>
+        <View style={styles.verticalLine} />
+        <Text style={styles.dayLabel}>{item.day}</Text>
+    </View>
+));
+
+const StampCard = memo(({ badge, isClaimed, onPress }: any) => (
+    <TouchableOpacity
+        style={styles.stampContainer}
+        onPress={onPress}
+        activeOpacity={0.7}
+    >
+        <View style={styles.imageWrapper}>
+            <Image
+                source={badge.image}
+                style={styles.stampImage}
+                resizeMode="contain"
+                fadeDuration={0}
+            />
+            {!isClaimed && (
+                <View style={styles.notificationDot} />
+            )}
+        </View>
+        <Text style={styles.stampName} numberOfLines={2}>
+            {badge.name}
+        </Text>
+    </TouchableOpacity>
+));
+
+export default function ImpactScreen({ navigation }: any) {
+    const { user } = useContext(AuthContext);
+    const { scanHistory } = useContext(GamificationContext);
+    const [selectedStamp, setSelectedStamp] = useState<Badge | null>(null);
+    const [showDetail, setShowDetail] = useState(false);
+
+    // Memoized stats
+    const stats = useMemo(() => ({
+        plasticSaved: ((user?.co2Saved || 0) / 1000).toFixed(2),
+        co2Reduced: (user?.co2Saved || 0) + 'g',
+        totalScans: user?.totalScans || 0,
+    }), [user?.co2Saved, user?.totalScans]);
+
+    // Calculate weekly data from real scan history
+    const weeklyData = useMemo(() => {
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const today = new Date();
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - today.getDay() + 1); // Monday
+
+        return days.map((day, index) => {
+            const targetDate = new Date(weekStart);
+            targetDate.setDate(weekStart.getDate() + index);
+            const dateStr = targetDate.toISOString().split('T')[0];
+
+            // Safety check for scanHistory
+            const scansForDay = scanHistory && Array.isArray(scanHistory)
+                ? scanHistory.filter(scan => {
+                    if (!scan.date) return false;
+                    const scanDate = new Date(scan.date);
+                    return scanDate.toDateString() === targetDate.toDateString();
+                }).length
+                : 0;
+
+            return {
+                day,
+                value: scansForDay,
+            };
+        });
+    }, [scanHistory]);
+
+    const maxValue = useMemo(() => Math.max(...weeklyData.map(d => d.value), 1), [weeklyData]);
+
+    // Get color based on value intensity (darker for more, lighter for less)
+    const getBarColor = useCallback((value: number) => {
+        if (value === 0) return '#e8e8e8';
+        const intensity = value / maxValue;
+        if (intensity > 0.7) return '#7fb069'; // Dark green
+        if (intensity > 0.4) return '#9bc785'; // Medium green
+        return '#c9e4bc'; // Light green
+    }, [maxValue]);
+
+    // Show 6 most recent unlocked stamps
+    const unlockedStamps = useMemo(() =>
+        badges
+            .filter(badge => (user?.totalScans || 0) >= badge.requirement)
+            .slice(0, 6),
+        [user?.totalScans]
+    );
+
+    const claimedBadges = useMemo(() => user?.claimedBadges || [], [user?.claimedBadges]);
+
+    const handleStampPress = useCallback((stamp: Badge) => {
+        setSelectedStamp(stamp);
+        setShowDetail(true);
+    }, []);
+
+    const handleCloseModal = useCallback(() => {
+        setShowDetail(false);
+    }, []);
+
+    const renderStamp = useCallback(({ item }: { item: Badge }) => {
+        const isClaimed = claimedBadges.includes(item.id);
+        return (
+            <StampCard
+                badge={item}
+                isClaimed={isClaimed}
+                onPress={() => handleStampPress(item)}
+            />
+        );
+    }, [claimedBadges, handleStampPress]);
+
+    const keyExtractor = useCallback((item: Badge) => item.id, []);
+
+    return (
+        <View style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor="#e8e2d1" />
+
+            {/* Header */}
+            <View style={styles.header}>
+                <Text style={styles.headerTitle}>Impact</Text>
+            </View>
+
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Your Contribution Section */}
+                <Text style={styles.sectionHeader}>Your Contribution</Text>
+                <View style={styles.contributionContainer}>
+                    <ContributionCard
+                        icon={require('../assets/icons/home-kg-plastic.png')}
+                        value={stats.plasticSaved}
+                        unit="kg"
+                        label="Plastic Saved"
+                        description="Equivalent to saving 2,100 standard bottles."
+                    />
+                    <ContributionCard
+                        icon={require('../assets/icons/home-co2.png')}
+                        value={stats.co2Reduced}
+                        unit="kg"
+                        label="CO₂ Reduced"
+                        description="Equal to planting 12 new trees."
+                    />
+                </View>
+
+                {/* Weekly Progress Section */}
+                {weeklyData.some(d => d.value > 0) && (
+                    <>
+                        <Text style={styles.sectionHeader}>Weekly Progress</Text>
+                        <View style={styles.weeklyGraphCard}>
+                            <View style={styles.graphContainer}>
+                                {/* Y-axis points */}
+                                <View style={styles.yAxisContainer}>
+                                    <Text style={styles.yAxisLabel}>{maxValue}</Text>
+                                    <Text style={styles.yAxisLabel}>{Math.ceil(maxValue * 0.75)}</Text>
+                                    <Text style={styles.yAxisLabel}>{Math.ceil(maxValue * 0.5)}</Text>
+                                    <Text style={styles.yAxisLabel}>{Math.ceil(maxValue * 0.25)}</Text>
+                                    <Text style={styles.yAxisLabel}>0</Text>
+                                </View>
+
+                                {/* Graph content with grid lines */}
+                                <View style={styles.graphContent}>
+                                    {/* Horizontal grid lines */}
+                                    <View style={styles.gridLinesContainer}>
+                                        {[0, 0.25, 0.5, 0.75, 1].map((_, index) => (
+                                            <View key={index} style={styles.gridLine} />
+                                        ))}
+                                    </View>
+
+                                    {/* Bars */}
+                                    <View style={styles.barsContainer}>
+                                        {weeklyData.map((item, index) => (
+                                            <WeeklyBar
+                                                key={index}
+                                                item={item}
+                                                maxValue={maxValue}
+                                                getBarColor={getBarColor}
+                                            />
+                                        ))}
+                                    </View>
+                                </View>
+                            </View>
+                        </View>
+                    </>
+                )}
+
+                {/* Achievements Section */}
+                <Text style={styles.sectionHeader}>Achievements</Text>
+                <View style={styles.achievementsContainer}>
+                    <FlatList
+                        data={unlockedStamps}
+                        renderItem={renderStamp}
+                        keyExtractor={keyExtractor}
+                        numColumns={3}
+                        scrollEnabled={false}
+                        columnWrapperStyle={styles.stampsRow}
+                        removeClippedSubviews={true}
+                        maxToRenderPerBatch={6}
+                        initialNumToRender={6}
+                        windowSize={3}
+                    />
+                    <TouchableOpacity
+                        style={styles.viewAllButton}
+                        onPress={() => navigation.navigate('Stamps')}
+                    >
+                        <Text style={styles.viewAllButtonText}>View All</Text>
+                        <Ionicons name="arrow-forward" size={16} color="#7fb069" />
+                    </TouchableOpacity>
+                </View>
+
+                {/* Inspiration Card */}
+                <LinearGradient
+                    colors={['#f5f9f3', '#d4e8d0']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                    style={styles.inspirationCard}
+                >
+                    <View style={styles.inspirationTextContainer}>
+                        <Text style={styles.inspirationHeading}>Keep It Up!</Text>
+                        <Text style={styles.inspirationSubheading}>
+                            You're making a real difference. Keep going!
+                        </Text>
+                    </View>
+                    <Image
+                        source={require('../assets/icons/impact-motivation.png')}
+                        style={styles.inspirationImage}
+                        resizeMode="contain"
+                        fadeDuration={0}
+                    />
+                </LinearGradient>
+            </ScrollView>
+
+            <StampDetailModal
+                visible={showDetail}
+                onClose={handleCloseModal}
+                stamp={selectedStamp}
+                isUnlocked={true}
+                isClaimed={selectedStamp ? claimedBadges.includes(selectedStamp.id) : false}
+            />
+        </View>
+    );
+}

@@ -1,569 +1,797 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useCallback, useMemo, memo } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    Alert,
     StatusBar,
-    Platform,
-    useWindowDimensions,
+    Image,
+    Modal,
+    Linking,
+    Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialCommunityIcons, Feather, Ionicons } from '@expo/vector-icons';
+import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { useSound } from '../contexts/SoundContext';
 import { signOut } from '../services/auth';
-import { getUserScans } from '../services/database';
-import { colors, spacing, typography, borderRadius, shadows } from '../constants/theme';
-import { Scan } from '../types';
+import { spacing, typography, borderRadius, colors } from '../constants/theme';
+import ProfilePictureModal from '../components/ProfilePictureModal';
 
-const BADGES = [
-    { id: '1', name: 'First Scan', icon: 'target', library: 'Feather', color: colors.secondary, requirement: 1 },
-    { id: '2', name: 'Starter', icon: 'rocket-outline', library: 'Ionicons', color: colors.info, requirement: 10 },
-    { id: '3', name: 'Pro Sorter', icon: 'fire', library: 'MaterialCommunityIcons', color: colors.warning, requirement: 50 },
-    { id: '4', name: 'Champion', icon: 'trophy-outline', library: 'Ionicons', color: colors.accent, requirement: 100 },
-    { id: '5', name: 'Perfect Week', icon: 'star-outline', library: 'Ionicons', color: colors.secondaryLight, requirement: 500 },
-    { id: '6', name: 'Expert', icon: 'school-outline', library: 'Ionicons', color: colors.primary, requirement: 1000 },
-];
+const getProfilePicture = (photoURL: string | null | undefined) => {
+    if (!photoURL) return null;
 
-export default function ProfileScreen({ navigation }: any) {
-    const { user } = useAuth();
-    const { width } = useWindowDimensions();
-    const { soundEnabled, toggleSound } = useSound();
-    const [recentScans, setRecentScans] = useState<Scan[]>([]);
-    const [loading, setLoading] = useState(true);
+    if (photoURL.startsWith('pf/')) {
+        const index = parseInt(photoURL.replace('pf/', '').replace('.png', ''));
+        const images = [
+            require('../assets/pf/1.png'),
+            require('../assets/pf/2.png'),
+            require('../assets/pf/3.png'),
+            require('../assets/pf/4.png'),
+            require('../assets/pf/5.png'),
+            require('../assets/pf/6.png'),
+            require('../assets/pf/7.png'),
+            require('../assets/pf/8.png'),
+            require('../assets/pf/9.png'),
+            require('../assets/pf/10.png'),
+            require('../assets/pf/11.png'),
+            require('../assets/pf/12.png'),
+        ];
+        return images[index - 1];
+    }
 
-    // Responsive badge width
-    const isDesktop = width > 768;
-    const badgeWidth = isDesktop ? '15%' : '30%';
+    return { uri: photoURL };
+};
 
-    useEffect(() => {
-        const fetchHistory = async () => {
-            if (user?.uid) {
-                const scans = await getUserScans(user.uid, 3);
-                setRecentScans(scans);
-                setLoading(false);
-            }
-        };
-        fetchHistory();
-    }, [user]);
+const getUserLeague = (totalScans: number) => {
+    if (totalScans >= 100) return 'Diamond';
+    if (totalScans >= 50) return 'Gold';
+    if (totalScans >= 20) return 'Silver';
+    return 'Bronze';
+};
 
-    const handleLogout = async () => {
-        Alert.alert(
-            'Logout',
-            'Are you sure you want to logout?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Logout',
-                    style: 'destructive',
-                    onPress: async () => {
-                        await signOut();
-                    },
-                },
-            ]
-        );
-    };
+const getLeagueColor = (league: string) => {
+    switch (league) {
+        case 'Diamond': return '#4FC3F7';
+        case 'Gold': return '#FFD700';
+        case 'Silver': return '#C0C0C0';
+        default: return '#CD7F32';
+    }
+};
 
-    const renderIcon = (library: string, name: string, size: number, color: string) => {
-        switch (library) {
-            case 'Feather': return <Feather name={name as any} size={size} color={color} />;
-            case 'Ionicons': return <Ionicons name={name as any} size={size} color={color} />;
-            case 'MaterialCommunityIcons': return <MaterialCommunityIcons name={name as any} size={size} color={color} />;
-            default: return <Feather name="help-circle" size={size} color={color} />;
+// Memoized components
+const StatCard = memo(({ icon, value, label, color, onPress }: any) => (
+    <TouchableOpacity
+        style={styles.statCard}
+        onPress={onPress}
+        activeOpacity={onPress ? 0.7 : 1}
+    >
+        <View style={[styles.statIconBg, { backgroundColor: color }]}>
+            {icon}
+        </View>
+        <Text style={styles.statValue}>{value}</Text>
+        <Text style={styles.statLabel}>{label}</Text>
+    </TouchableOpacity>
+));
+
+const SettingItem = memo(({ icon, label, description, onPress, iconColor = '#7fb069', disabled = false }: any) => (
+    <TouchableOpacity
+        style={[styles.settingItem, disabled && { opacity: 0.5 }]}
+        onPress={onPress}
+        activeOpacity={disabled ? 1 : 0.7}
+        disabled={disabled}
+    >
+        <View style={[styles.settingIcon, { backgroundColor: `${iconColor}15` }]}>
+            {icon}
+        </View>
+        <View style={styles.settingContent}>
+            <Text style={styles.settingLabel}>{label}</Text>
+            {description && <Text style={styles.settingDescription}>{description}</Text>}
+        </View>
+        <Feather name="chevron-right" size={18} color="#9CA3AF" />
+    </TouchableOpacity>
+));
+
+const SettingToggle = memo(({ icon, label, description, value, onValueChange, iconColor = '#7fb069', disabled = false, badge = null }: any) => (
+    <View style={[styles.settingItem, disabled && { opacity: 0.5 }]}>
+        <View style={[styles.settingIcon, { backgroundColor: `${iconColor}15` }]}>
+            {icon}
+        </View>
+        <View style={styles.settingContent}>
+            <View style={styles.labelRow}>
+                <Text style={styles.settingLabel}>{label}</Text>
+                {badge && (
+                    <View style={styles.comingSoonBadge}>
+                        <Text style={styles.comingSoonText}>{badge}</Text>
+                    </View>
+                )}
+            </View>
+            {description && <Text style={styles.settingDescription}>{description}</Text>}
+        </View>
+        <Switch
+            value={value}
+            onValueChange={onValueChange}
+            disabled={disabled}
+            trackColor={{ false: '#E5E7EB', true: '#7fb069' }}
+            thumbColor="#FFFFFF"
+            ios_backgroundColor="#E5E7EB"
+        />
+    </View>
+));
+
+// Custom Modal Component
+const CustomModal = memo(({ visible, onClose, title, message, type = 'info' }: any) => {
+    const getIcon = () => {
+        switch (type) {
+            case 'success':
+                return <Ionicons name="checkmark-circle" size={56} color="#7fb069" />;
+            case 'error':
+                return <Ionicons name="close-circle" size={56} color="#EF4444" />;
+            case 'warning':
+                return <Ionicons name="warning" size={56} color="#FF9800" />;
+            default:
+                return <Ionicons name="information-circle" size={56} color="#4FC3F7" />;
         }
     };
 
-    const isBadgeUnlocked = (requirement: number) => {
-        return (user?.totalScans || 0) >= requirement;
-    };
+    return (
+        <Modal
+            visible={visible}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={onClose}
+        >
+            <View style={styles.modalOverlay}>
+                <View style={styles.customModal}>
+                    {getIcon()}
+                    <Text style={styles.modalTitle}>{title}</Text>
+                    <Text style={styles.modalMessage}>{message}</Text>
+                    <TouchableOpacity style={styles.modalButton} onPress={onClose}>
+                        <Text style={styles.modalButtonText}>OK</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        </Modal>
+    );
+});
+
+// Confirm Modal Component
+const ConfirmModal = memo(({ visible, onClose, onConfirm, title, message }: any) => (
+    <Modal
+        visible={visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={onClose}
+    >
+        <View style={styles.modalOverlay}>
+            <View style={styles.customModal}>
+                <Ionicons name="help-circle" size={56} color="#FF9800" />
+                <Text style={styles.modalTitle}>{title}</Text>
+                <Text style={styles.modalMessage}>{message}</Text>
+                <View style={styles.modalButtons}>
+                    <TouchableOpacity style={styles.modalCancelButton} onPress={onClose}>
+                        <Text style={styles.modalCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.modalConfirmButton} onPress={onConfirm}>
+                        <Text style={styles.modalConfirmText}>Confirm</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        </View>
+    </Modal>
+));
+
+export default function ProfileScreen({ navigation }: any) {
+    const { user, updateProfilePicture } = useAuth();
+    const { colors: themeColors, isDarkMode, toggleTheme } = useTheme();
+    const { soundEnabled, toggleSound } = useSound();
+
+    const [isPictureModalVisible, setIsPictureModalVisible] = useState(false);
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+    const [notification, setNotification] = useState({ visible: false, title: '', message: '', type: 'info' });
+
+    const showNotification = useCallback((title: string, message: string, type = 'info') => {
+        setNotification({ visible: true, title, message, type });
+    }, []);
+
+    const hideNotification = useCallback(() => {
+        setNotification({ visible: false, title: '', message: '', type: 'info' });
+    }, []);
+
+    const handleLogout = useCallback(async () => {
+        setShowLogoutConfirm(false);
+        await signOut();
+    }, []);
+
+    const handlePictureSelect = useCallback(async (index: number) => {
+        try {
+            await updateProfilePicture(index);
+            setIsPictureModalVisible(false);
+            showNotification('Success', 'Profile picture updated successfully!', 'success');
+        } catch (error) {
+            showNotification('Error', 'Failed to update profile picture. Please try again.', 'error');
+        }
+    }, [updateProfilePicture, showNotification]);
+
+    const handleOpenURL = useCallback((url: string) => {
+        Linking.openURL(url).catch(() => {
+            showNotification('Error', 'Could not open link', 'error');
+        });
+    }, [showNotification]);
+
+    const currentLeague = useMemo(() => getUserLeague(user?.totalScans || 0), [user?.totalScans]);
+    const leagueColor = useMemo(() => getLeagueColor(currentLeague), [currentLeague]);
+    const profileImageSource = useMemo(() => getProfilePicture(user?.photoURL), [user?.photoURL]);
+
+    const currentPictureIndex = useMemo(() => {
+        if (user?.photoURL && user.photoURL.startsWith('pf/')) {
+            return parseInt(user.photoURL.replace('pf/', '').replace('.png', '')) - 1;
+        }
+        return 0;
+    }, [user?.photoURL]);
+
+    const stats = useMemo(() => ({
+        currentStreak: user?.currentStreak || 0,
+        co2Saved: user?.co2Saved || 0,
+        plasticSaved: ((user?.co2Saved || 0) / 1000).toFixed(2),
+    }), [user]);
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" />
+            <StatusBar barStyle="dark-content" backgroundColor="#e8e2d1" />
+
+            {/* Header */}
+            <View style={styles.header}>
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => navigation.goBack()}
+                >
+                    <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Profile</Text>
+                <TouchableOpacity
+                    style={styles.settingsButton}
+                    onPress={() => navigation.navigate('Settings')}
+                >
+                    <Ionicons name="settings-outline" size={24} color={colors.textPrimary} />
+                </TouchableOpacity>
+            </View>
 
             <ScrollView
                 style={styles.content}
                 showsVerticalScrollIndicator={false}
-                bounces={false}
+                removeClippedSubviews={true}
             >
-                {/* Header with Gradient Cover */}
-                <View style={styles.headerContainer}>
-                    <LinearGradient
-                        colors={[colors.primary, colors.primaryLight]}
-                        style={styles.coverPhoto}
+                {/* Profile Header */}
+                <View style={styles.profileHeader}>
+                    <TouchableOpacity
+                        style={styles.avatarContainer}
+                        onPress={() => setIsPictureModalVisible(true)}
+                        activeOpacity={0.8}
                     >
-                        <TouchableOpacity style={styles.editButton}>
-                            <Feather name="edit-2" size={20} color={colors.white} />
-                        </TouchableOpacity>
-                    </LinearGradient>
-
-                    <View style={styles.profileHeader}>
-                        <View style={styles.avatarContainer}>
+                        <LinearGradient
+                            colors={[leagueColor, `${leagueColor}90`]}
+                            style={styles.avatarGradient}
+                        >
                             <View style={styles.avatar}>
-                                {user?.photoURL ? (
-                                    // Image component would go here
-                                    <Text style={styles.avatarText}>{user.displayName?.[0] || 'U'}</Text>
+                                {profileImageSource ? (
+                                    <Image source={profileImageSource} style={styles.avatarImage} />
                                 ) : (
                                     <Text style={styles.avatarText}>{user?.displayName?.[0] || 'U'}</Text>
                                 )}
                             </View>
-                            <View style={styles.onlineBadge} />
+                        </LinearGradient>
+                        <View style={[styles.editBadge, { backgroundColor: leagueColor }]}>
+                            <Feather name="edit-2" size={14} color="#FFFFFF" />
                         </View>
+                    </TouchableOpacity>
 
-                        <Text style={styles.userName}>{user?.displayName || 'Guest User'}</Text>
-                        <Text style={styles.userEmail}>{user?.email || 'guest@plastisort.ai'}</Text>
+                    <Text style={styles.userName}>{user?.displayName || 'Guest User'}</Text>
+                    <Text style={styles.userEmail}>{user?.email || 'guest@example.com'}</Text>
 
-                        <View style={styles.userStats}>
-                            <UserStat
-                                label="Level"
-                                value={user?.level.toString() || '1'}
-                                icon={<Ionicons name="star" size={16} color={colors.warning} />}
-                            />
-                            <View style={styles.statDivider} />
-                            <UserStat
-                                label="Rank"
-                                value={`#${(user as any)?.rank || '-'}`}
-                                icon={<Ionicons name="trophy" size={16} color={colors.accent} />}
-                            />
-                            <View style={styles.statDivider} />
-                            <UserStat
-                                label="Points"
-                                value={user?.totalPoints?.toString() || '0'}
-                                icon={<Ionicons name="leaf" size={16} color={colors.secondary} />}
-                            />
-                        </View>
+                    {/* League Badge */}
+                    <View style={[styles.leagueBadge, { backgroundColor: `${leagueColor}15`, borderColor: `${leagueColor}30` }]}>
+                        <Ionicons name="trophy-outline" size={16} color={leagueColor} />
+                        <Text style={[styles.leagueText, { color: leagueColor }]}>{currentLeague}</Text>
                     </View>
                 </View>
 
-                {/* Achievement Badges */}
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Achievement Badges</Text>
-                        <TouchableOpacity>
-                            <Text style={styles.seeAllText}>View All</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.badgesGrid}>
-                        {BADGES.map((badge) => {
-                            const unlocked = isBadgeUnlocked(badge.requirement);
-                            return (
-                                <View key={badge.id} style={[styles.badgeCard, { width: badgeWidth }, !unlocked && styles.badgeLocked]}>
-                                    <View style={[styles.badgeIconContainer, { backgroundColor: unlocked ? `${badge.color}20` : colors.lightGray }]}>
-                                        {renderIcon(badge.library, badge.icon, 24, unlocked ? badge.color : colors.textSecondary)}
-                                    </View>
-                                    <Text style={styles.badgeName} numberOfLines={1}>{badge.name}</Text>
-                                    {!unlocked && (
-                                        <View style={styles.lockOverlay}>
-                                            <Feather name="lock" size={12} color={colors.textSecondary} />
-                                        </View>
-                                    )}
-                                </View>
-                            );
-                        })}
-                    </View>
-                </View>
-
-                {/* Scan History */}
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Recent Scans</Text>
-                        <TouchableOpacity onPress={() => navigation.navigate('Scan')}>
-                            <Text style={styles.seeAllText}>Scan New</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.historyCard}>
-                        {recentScans.length > 0 ? (
-                            recentScans.map((scan, index) => (
-                                <React.Fragment key={scan.id}>
-                                    <ScanHistoryItem
-                                        type={scan.plasticType}
-                                        date={scan.timestamp ? new Date(scan.timestamp).toLocaleDateString() : 'Just now'}
-                                        binColor={scan.binColor}
-                                        points={`+${scan.co2Saved}`}
-                                    />
-                                    {index < recentScans.length - 1 && <View style={styles.divider} />}
-                                </React.Fragment>
-                            ))
-                        ) : (
-                            <View style={styles.emptyState}>
-                                <Text style={styles.emptyStateText}>No scans yet. Start scanning!</Text>
-                            </View>
-                        )}
-                    </View>
-                </View>
-
-                {/* Settings */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Settings</Text>
-                    <View style={styles.settingsCard}>
-                        <SettingItem
-                            icon={<Feather name="user" size={20} color={colors.primary} />}
-                            label="Account Settings"
-                            value="Manage"
+                {/* Stats Cards */}
+                <View style={styles.statsSection}>
+                    <View style={styles.statsContainer}>
+                        <StatCard
+                            icon={<Ionicons name="flame-outline" size={22} color="#FFFFFF" />}
+                            value={stats.currentStreak}
+                            label="Day Streak"
+                            color="#FF6B6B"
+                            onPress={() => navigation.navigate('Impact')}
                         />
-                        <View style={styles.divider} />
-                        <SettingItem
-                            icon={<Feather name="bell" size={20} color={colors.warning} />}
-                            label="Notifications"
-                            value="On"
+                        <StatCard
+                            icon={<Ionicons name="leaf-outline" size={22} color="#FFFFFF" />}
+                            value={`${stats.co2Saved}g`}
+                            label="CO₂ Saved"
+                            color="#7fb069"
+                            onPress={() => navigation.navigate('Impact')}
                         />
-                        <View style={styles.divider} />
-                        <SettingItem
-                            icon={<Feather name="volume-2" size={20} color={colors.secondary} />}
+                        <StatCard
+                            icon={<MaterialCommunityIcons name="recycle" size={22} color="#FFFFFF" />}
+                            value={`${stats.plasticSaved}kg`}
+                            label="Plastic Saved"
+                            color="#4FC3F7"
+                            onPress={() => navigation.navigate('Impact')}
+                        />
+                    </View>
+                </View>
+
+                {/* Preferences Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Preferences</Text>
+                    <View style={styles.groupedCard}>
+                        <SettingToggle
+                            icon={<Ionicons name={isDarkMode ? "moon-outline" : "sunny-outline"} size={20} color="#7fb069" />}
+                            label="Dark Mode"
+                            description="Switch between light and dark theme"
+                            value={false}
+                            onValueChange={() => {}}
+                            disabled={true}
+                            badge="Coming Soon"
+                        />
+                        
+                        <View style={styles.itemDivider} />
+
+                        <SettingToggle
+                            icon={<Ionicons name={soundEnabled ? "volume-high-outline" : "volume-mute-outline"} size={20} color="#7fb069" />}
                             label="Sound Effects"
-                            value={soundEnabled ? "On" : "Off"}
-                            onPress={toggleSound}
-                        />
-                        <View style={styles.divider} />
-                        <SettingItem
-                            icon={<Feather name="globe" size={20} color={colors.info} />}
-                            label="Language"
-                            value="English"
-                        />
-                        <View style={styles.divider} />
-                        <SettingItem
-                            icon={<Feather name="shield" size={20} color={colors.success} />}
-                            label="Privacy & Security"
+                            description="Enable or disable app sounds"
+                            value={soundEnabled}
+                            onValueChange={toggleSound}
                         />
                     </View>
                 </View>
 
-                {/* Support & Logout */}
+                {/* Data & Privacy Section */}
                 <View style={styles.section}>
-                    <View style={styles.settingsCard}>
+                    <Text style={styles.sectionTitle}>Data & Privacy</Text>
+                    <View style={styles.groupedCard}>
                         <SettingItem
-                            icon={<Feather name="help-circle" size={20} color={colors.secondary} />}
-                            label="Help & Support"
+                            icon={<MaterialCommunityIcons name="download-outline" size={20} color="#7fb069" />}
+                            label="Download My Data"
+                            description="Export your scan history"
+                            onPress={() => showNotification('Coming Soon', 'This feature will be available soon!', 'info')}
                         />
-                        <View style={styles.divider} />
+
+                        <View style={styles.itemDivider} />
+
                         <SettingItem
-                            icon={<Feather name="info" size={20} color={colors.textSecondary} />}
-                            label="About PlastiSort"
-                            value="v1.0.0"
+                            icon={<MaterialCommunityIcons name="shield-check-outline" size={20} color="#7fb069" />}
+                            label="Privacy Policy"
+                            description="Read our privacy policy"
+                            onPress={() => navigation.navigate('PrivacyPolicy')}
+                        />
+
+                        <View style={styles.itemDivider} />
+
+                        <SettingItem
+                            icon={<MaterialCommunityIcons name="file-document-outline" size={20} color="#7fb069" />}
+                            label="Terms of Service"
+                            description="Read our terms and conditions"
+                            onPress={() => navigation.navigate('TermsOfService')}
                         />
                     </View>
+                </View>
 
-                    <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                        <Feather name="log-out" size={20} color={colors.white} />
+                {/* Help & Support Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Help & Support</Text>
+                    <View style={styles.groupedCard}>
+                        <SettingItem
+                            icon={<Feather name="help-circle" size={20} color="#7fb069" />}
+                            label="Help Center"
+                            description="Get help and FAQs"
+                            onPress={() => navigation.navigate('Help')}
+                        />
+
+                        <View style={styles.itemDivider} />
+
+                        <SettingItem
+                            icon={<Feather name="star" size={20} color="#7fb069" />}
+                            label="Rate Us"
+                            description="Rate PlastiSort on the app store"
+                            onPress={() => showNotification('Thank You!', 'Please rate us on your app store', 'success')}
+                        />
+
+                        <View style={styles.itemDivider} />
+
+                        <SettingItem
+                            icon={<Feather name="share-2" size={20} color="#7fb069" />}
+                            label="Share App"
+                            description="Share PlastiSort with friends"
+                            onPress={() => showNotification('Share', 'Share PlastiSort with your friends!', 'info')}
+                        />
+                    </View>
+                </View>
+
+                {/* About Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>About</Text>
+                    <View style={styles.groupedCard}>
+                        <SettingItem
+                            icon={<Feather name="info" size={20} color="#7fb069" />}
+                            label="About PlastiSort"
+                            description="Version 1.0.0"
+                            onPress={() => navigation.navigate('About')}
+                        />
+
+                        <View style={styles.itemDivider} />
+
+                        <SettingItem
+                            icon={<MaterialCommunityIcons name="update" size={20} color="#7fb069" />}
+                            label="Check for Updates"
+                            description="See if new version is available"
+                            onPress={() => showNotification('Up to Date', 'You are using the latest version!', 'success')}
+                        />
+                    </View>
+                </View>
+
+                {/* Logout Button */}
+                <View style={styles.section}>
+                    <TouchableOpacity
+                        style={styles.logoutButton}
+                        onPress={() => setShowLogoutConfirm(true)}
+                        activeOpacity={0.8}
+                    >
+                        <Feather name="log-out" size={18} color="#FFFFFF" />
                         <Text style={styles.logoutButtonText}>Log Out</Text>
                     </TouchableOpacity>
                 </View>
 
                 <View style={styles.bottomSpacer} />
             </ScrollView>
+
+            <ProfilePictureModal
+                visible={isPictureModalVisible}
+                currentPicture={currentPictureIndex}
+                onClose={() => setIsPictureModalVisible(false)}
+                onSelect={handlePictureSelect}
+            />
+
+            <CustomModal
+                visible={notification.visible}
+                onClose={hideNotification}
+                title={notification.title}
+                message={notification.message}
+                type={notification.type}
+            />
+
+            <ConfirmModal
+                visible={showLogoutConfirm}
+                onClose={() => setShowLogoutConfirm(false)}
+                onConfirm={handleLogout}
+                title="Logout"
+                message="Are you sure you want to logout?"
+            />
         </View>
     );
 }
 
-const UserStat = ({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) => (
-    <View style={styles.stat}>
-        <View style={styles.statValueContainer}>
-            {icon}
-            <Text style={styles.statValue}>{value}</Text>
-        </View>
-        <Text style={styles.statLabel}>{label}</Text>
-    </View>
-);
-
-const ScanHistoryItem = ({ type, date, binColor, points }: any) => (
-    <TouchableOpacity style={styles.historyItem}>
-        <View style={[styles.historyIcon, { backgroundColor: binColor === 'green' ? `${colors.recyclableGreen}20` : `${colors.nonRecyclableRed}20` }]}>
-            <MaterialCommunityIcons
-                name="recycle"
-                size={24}
-                color={binColor === 'green' ? colors.recyclableGreen : colors.nonRecyclableRed}
-            />
-        </View>
-        <View style={styles.historyContent}>
-            <Text style={styles.historyType}>{type} Plastic</Text>
-            <Text style={styles.historyDate}>{date}</Text>
-        </View>
-        <View style={styles.historyRight}>
-            <Text style={styles.historyPoints}>{points} pts</Text>
-            <Feather name="chevron-right" size={16} color={colors.textMuted} />
-        </View>
-    </TouchableOpacity>
-);
-
-const SettingItem = ({ icon, label, value, onPress }: any) => (
-    <TouchableOpacity style={styles.settingItem} onPress={onPress}>
-        <View style={styles.settingIconContainer}>
-            {icon}
-        </View>
-        <Text style={styles.settingLabel}>{label}</Text>
-        {value && <Text style={styles.settingValue}>{value}</Text>}
-        <Feather name="chevron-right" size={16} color={colors.textMuted} />
-    </TouchableOpacity>
-);
-
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.lightGray,
+        backgroundColor: '#e8e2d1',
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: spacing.lg,
+        paddingTop: spacing.xl,
+        paddingBottom: spacing.md,
+        backgroundColor: '#e8e2d1',
+    },
+    headerTitle: {
+        fontSize: typography.fontSize.heading,
+        fontWeight: typography.fontWeight.bold,
+        color: colors.textPrimary,
+        letterSpacing: 0.3,
+    },
+    backButton: {
+        padding: spacing.xs,
+    },
+    settingsButton: {
+        padding: spacing.xs,
     },
     content: {
         flex: 1,
     },
-    headerContainer: {
-        marginBottom: spacing.lg,
-        backgroundColor: colors.white,
-        borderBottomLeftRadius: borderRadius.xxl,
-        borderBottomRightRadius: borderRadius.xxl,
-        ...shadows.sm,
-        paddingBottom: spacing.xl,
-    },
-    coverPhoto: {
-        height: 140,
-        width: '100%',
-    },
-    editButton: {
-        position: 'absolute',
-        top: spacing.xl * 1.5,
-        right: spacing.lg,
-        width: 40,
-        height: 40,
-        borderRadius: borderRadius.round,
-        backgroundColor: 'rgba(0, 0, 0, 0.3)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
     profileHeader: {
         alignItems: 'center',
-        marginTop: -50,
+        paddingTop: spacing.xl,
+        paddingBottom: spacing.lg,
+        paddingHorizontal: spacing.lg,
+        backgroundColor: colors.white,
+        borderBottomLeftRadius: borderRadius.xl,
+        borderBottomRightRadius: borderRadius.xl,
+        marginBottom: spacing.md,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
     },
     avatarContainer: {
         position: 'relative',
         marginBottom: spacing.md,
     },
-    avatar: {
+    avatarGradient: {
         width: 100,
         height: 100,
-        borderRadius: borderRadius.round,
-        backgroundColor: colors.secondary,
+        borderRadius: 50,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 4,
+        padding: 4,
+    },
+    avatar: {
+        width: 92,
+        height: 92,
+        borderRadius: 46,
+        backgroundColor: '#7fb069',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 3,
         borderColor: colors.white,
-        ...shadows.md,
+    },
+    avatarImage: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 46,
     },
     avatarText: {
-        fontSize: 40,
+        fontSize: 32,
         fontWeight: typography.fontWeight.bold,
         color: colors.white,
     },
-    onlineBadge: {
+    editBadge: {
         position: 'absolute',
-        bottom: 5,
-        right: 5,
-        width: 20,
-        height: 20,
-        borderRadius: borderRadius.round,
-        backgroundColor: colors.success,
+        bottom: 0,
+        right: 0,
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
         borderWidth: 3,
         borderColor: colors.white,
     },
     userName: {
-        fontSize: typography.fontSize.heading,
+        fontSize: typography.fontSize.title,
         fontWeight: typography.fontWeight.bold,
         color: colors.textPrimary,
-        marginBottom: spacing.xxs,
+        marginBottom: 2,
     },
     userEmail: {
-        fontSize: typography.fontSize.body,
+        fontSize: typography.fontSize.small,
         color: colors.textSecondary,
-        marginBottom: spacing.lg,
+        marginBottom: spacing.md,
     },
-    userStats: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: colors.lightGray,
-        paddingVertical: spacing.md,
-        paddingHorizontal: spacing.xl,
-        borderRadius: borderRadius.xl,
-        gap: spacing.lg,
-    },
-    stat: {
-        alignItems: 'center',
-    },
-    statValueContainer: {
+    leagueBadge: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: spacing.xs,
-        marginBottom: spacing.xxs,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.xs,
+        borderRadius: borderRadius.round,
+        borderWidth: 1,
+    },
+    leagueText: {
+        fontSize: typography.fontSize.small,
+        fontWeight: typography.fontWeight.semiBold,
+    },
+    statsSection: {
+        paddingHorizontal: spacing.lg,
+        marginBottom: spacing.md,
+    },
+    statsContainer: {
+        flexDirection: 'row',
+        gap: spacing.sm,
+    },
+    statCard: {
+        flex: 1,
+        backgroundColor: colors.white,
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.xs,
+        borderRadius: borderRadius.lg,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    statIconBg: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: spacing.sm,
     },
     statValue: {
-        fontSize: typography.fontSize.bodyLarge,
+        fontSize: typography.fontSize.body,
         fontWeight: typography.fontWeight.bold,
         color: colors.textPrimary,
+        marginBottom: 2,
     },
     statLabel: {
-        fontSize: typography.fontSize.small,
+        fontSize: 11,
         color: colors.textSecondary,
         fontWeight: typography.fontWeight.medium,
-    },
-    statDivider: {
-        width: 1,
-        height: 24,
-        backgroundColor: colors.mediumGray,
+        textAlign: 'center',
     },
     section: {
         paddingHorizontal: spacing.lg,
         marginBottom: spacing.lg,
     },
-    sectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: spacing.md,
-    },
     sectionTitle: {
-        fontSize: typography.fontSize.heading,
-        fontWeight: typography.fontWeight.bold,
-        color: colors.textPrimary,
-        marginBottom: spacing.sm,
-    },
-    seeAllText: {
-        fontSize: typography.fontSize.caption,
-        color: colors.secondary,
+        fontSize: 11,
         fontWeight: typography.fontWeight.semiBold,
+        color: colors.textSecondary,
+        marginBottom: spacing.sm,
+        textTransform: 'uppercase',
+        letterSpacing: 0.8,
     },
-    badgesGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: spacing.md,
-    },
-    badgeCard: {
-        aspectRatio: 0.9,
+    groupedCard: {
         backgroundColor: colors.white,
         borderRadius: borderRadius.lg,
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: spacing.sm,
-        ...shadows.xs,
-    },
-    badgeLocked: {
-        opacity: 0.7,
-        backgroundColor: colors.lightGray,
-    },
-    badgeIconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: borderRadius.round,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: spacing.sm,
-    },
-    badgeName: {
-        fontSize: typography.fontSize.small,
-        fontWeight: typography.fontWeight.medium,
-        color: colors.textPrimary,
-        textAlign: 'center',
-    },
-    lockOverlay: {
-        position: 'absolute',
-        top: spacing.xs,
-        right: spacing.xs,
-    },
-    historyCard: {
-        backgroundColor: colors.white,
-        borderRadius: borderRadius.xl,
-        padding: spacing.sm,
-        ...shadows.sm,
-    },
-    historyItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: spacing.md,
-    },
-    historyIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: borderRadius.md,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: spacing.md,
-    },
-    historyContent: {
-        flex: 1,
-    },
-    historyType: {
-        fontSize: typography.fontSize.body,
-        fontWeight: typography.fontWeight.semiBold,
-        color: colors.textPrimary,
-    },
-    historyDate: {
-        fontSize: typography.fontSize.small,
-        color: colors.textSecondary,
-    },
-    historyRight: {
-        alignItems: 'flex-end',
-        gap: spacing.xxs,
-    },
-    historyPoints: {
-        fontSize: typography.fontSize.caption,
-        fontWeight: typography.fontWeight.bold,
-        color: colors.secondary,
-    },
-    divider: {
-        height: 1,
-        backgroundColor: colors.lightGray,
-        marginLeft: spacing.xl + spacing.md,
-    },
-    emptyState: {
-        padding: spacing.lg,
-        alignItems: 'center',
-    },
-    emptyStateText: {
-        color: colors.textSecondary,
-        fontSize: typography.fontSize.body,
-    },
-    settingsCard: {
-        backgroundColor: colors.white,
-        borderRadius: borderRadius.xl,
-        ...shadows.sm,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
         overflow: 'hidden',
     },
     settingItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: spacing.md,
-        backgroundColor: colors.white,
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.md,
     },
-    settingIconContainer: {
-        width: 36,
+    itemDivider: {
+        height: 1,
+        backgroundColor: '#F3F4F6',
+        marginLeft: 68,
+    },
+    settingIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         alignItems: 'center',
-        marginRight: spacing.sm,
+        justifyContent: 'center',
+        marginRight: spacing.md,
+    },
+    settingContent: {
+        flex: 1,
     },
     settingLabel: {
-        flex: 1,
         fontSize: typography.fontSize.body,
         color: colors.textPrimary,
+        fontWeight: typography.fontWeight.semiBold,
+        marginBottom: 2,
     },
-    settingValue: {
-        fontSize: typography.fontSize.caption,
+    settingDescription: {
+        fontSize: typography.fontSize.small,
         color: colors.textSecondary,
-        marginRight: spacing.sm,
+        marginTop: 1,
+    },
+    labelRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+    },
+    comingSoonBadge: {
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: spacing.xs,
+        paddingVertical: 2,
+        borderRadius: borderRadius.sm,
+    },
+    comingSoonText: {
+        fontSize: 10,
+        color: '#92400E',
+        fontWeight: typography.fontWeight.bold,
     },
     logoutButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: colors.error,
+        backgroundColor: '#7fb069',
         paddingVertical: spacing.md,
-        borderRadius: borderRadius.xl,
-        marginTop: spacing.xl,
+        borderRadius: borderRadius.lg,
         gap: spacing.sm,
-        ...shadows.md,
+        shadowColor: '#7fb069',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 3,
     },
     logoutButtonText: {
         color: colors.white,
         fontSize: typography.fontSize.body,
-        fontWeight: typography.fontWeight.bold,
+        fontWeight: typography.fontWeight.semiBold,
     },
     bottomSpacer: {
-        height: spacing.xxxl,
+        height: 80,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: spacing.xl,
+    },
+    customModal: {
+        backgroundColor: colors.white,
+        borderRadius: borderRadius.xl,
+        padding: spacing.xl,
+        width: '100%',
+        maxWidth: 340,
+        alignItems: 'center',
+    },
+    modalTitle: {
+        fontSize: typography.fontSize.title,
+        fontWeight: typography.fontWeight.bold,
+        color: colors.textPrimary,
+        marginTop: spacing.md,
+        marginBottom: spacing.xs,
+        textAlign: 'center',
+    },
+    modalMessage: {
+        fontSize: typography.fontSize.body,
+        color: colors.textSecondary,
+        textAlign: 'center',
+        lineHeight: typography.fontSize.body * 1.5,
+        marginBottom: spacing.lg,
+    },
+    modalButton: {
+        backgroundColor: '#7fb069',
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.xxxl,
+        borderRadius: borderRadius.lg,
+        width: '100%',
+        alignItems: 'center',
+    },
+    modalButtonText: {
+        color: colors.white,
+        fontSize: typography.fontSize.body,
+        fontWeight: typography.fontWeight.semiBold,
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        gap: spacing.sm,
+        width: '100%',
+    },
+    modalCancelButton: {
+        flex: 1,
+        backgroundColor: colors.lightGray,
+        paddingVertical: spacing.md,
+        borderRadius: borderRadius.lg,
+        alignItems: 'center',
+    },
+    modalCancelText: {
+        color: colors.textPrimary,
+        fontSize: typography.fontSize.body,
+        fontWeight: typography.fontWeight.semiBold,
+    },
+    modalConfirmButton: {
+        flex: 1,
+        backgroundColor: '#7fb069',
+        paddingVertical: spacing.md,
+        borderRadius: borderRadius.lg,
+        alignItems: 'center',
+    },
+    modalConfirmText: {
+        color: colors.white,
+        fontSize: typography.fontSize.body,
+        fontWeight: typography.fontWeight.semiBold,
     },
 });
