@@ -1,13 +1,8 @@
 import { Platform } from 'react-native';
 
-const CLOUD_NAME = 'duogmkv22';
-const UPLOAD_PRESET = 'eco-lens';
+const CLOUD_NAME = '#';
+const UPLOAD_PRESET = '#';
 
-/**
- * Upload a file to Cloudinary with automatic optimization and compression
- * @param {string} imageUri - The local URI of the image to upload
- * @returns {Promise<Object>} Upload response with URL and metadata
- */
 export const uploadToCloudinary = async (imageUri: string) => {
     if (!CLOUD_NAME || !UPLOAD_PRESET) {
         throw new Error('Cloudinary configuration is missing');
